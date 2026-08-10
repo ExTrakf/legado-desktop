@@ -161,6 +161,17 @@ else
   grep "❌" /tmp/legado_net_smoke.log | head -10
 fi
 
+# ---------- 4.8 Part3 规则引擎冒烟（T3.1 AnalyzeRule + T3.2 AnalyzeUrl + T3.3 Rhino + T3.4 联测） ----------
+echo "== 4.8 Part3 规则引擎冒烟（--rule-smoke-test） =="
+LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --rule-smoke-test > /tmp/legado_rule_smoke.log 2>&1
+RULE_EXIT=$?
+if [ $RULE_EXIT -eq 0 ]; then
+  ok "Part3 冒烟全部通过（$(grep -c '✅' /tmp/legado_rule_smoke.log) 项断言）"
+else
+  bad "Part3 冒烟失败（exit=$RULE_EXIT）"
+  grep "❌" /tmp/legado_rule_smoke.log | head -10
+fi
+
 # ---------- 5. 停止服务 ----------
 echo "== 5. 停止服务 =="
 if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null; echo "  killed server pid=$SERVER_PID"; fi

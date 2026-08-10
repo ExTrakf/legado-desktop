@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T21:35:00+08:00",
+  "updatedAt": "2026-08-10T22:30:00+08:00",
   "project": "legado-desktop",
   "source": {
     "repo": "https://github.com/LegadoTeam/legado",
@@ -39,15 +39,16 @@
     "教训10：Android SQLite 的 collate localized 桌面版不存在，Room schema 中 bookmarks/readRecord/highlights 排序用它。修复：sqlite-jdbc 3.50 提供 org.sqlite.Collation.create，在 SqliteDatabase.init 注册 localized（大小写不敏感比较），SQL 保持原样",
     "教训11：硬编码资源数组必须对照原版 values-zh/arrays.xml——ReadTipConfig 曾把 tipNames 写成\"默认/间隔/上下/左右\"（实际应为 无/书名/标题/时间/电量/电量%/页数/进度(%)），tipColorNames/tipDividerColorNames 也错写为颜色名。已修正",
     "教训12：OkHttp 走 HTTP 代理时向代理发送绝对 URI 形式请求行；本地 HttpServer 可模拟代理（返回 PROXY:uri 前缀验证请求确实经代理）。SOCKS5 验证用 mock ServerSocket 按 RFC1929 帧解析（auth 头 [01,ulen] 第二字节即 ulen，勿再 read 一次）",
-    "教训13：测试断言要命中对端点——cookie 注入验证曾请求 /ua（只回显 User-Agent），永远不可能含 Cookie，误判 loadRequest 失效；应建 /cookie 端点回显请求 Cookie 头"
+    "教训13：测试断言要命中对端点——cookie 注入验证曾请求 /ua（只回显 User-Agent），永远不可能含 Cookie，误判 loadRequest 失效；应建 /cookie 端点回显请求 Cookie 头",
+    "教训14：桌面版缺 /scripts/cryptojs.min.js 资源——SharedJsScope.getCryptoScope 加载失败会静默返回 null（runCatching 吞异常），JS 源 crypto 绑定全部失效且不报错。补齐资源后 CryptoJS.MD5 可用。凡代码 getResourceAsStream('/scripts/...') 的地方必须核对资源存在（对照原版 assets/scripts/）"
   ],
   "current": {
-    "part": 2,
-    "task": "T2.1~T2.4 全部完成",
+    "part": 3,
+    "task": "T3.1~T3.4 全部完成",
     "taskStatus": "done",
-    "whatImDoing": "Part 2 配置与网络层完成：--net-smoke-test 16 项断言全过（T2.1 配置读写+重启保持 / T2.2 StrResponse+gzip+deflate+brotli 解压+UA 注入+真实 https(example.com br) / T2.3 Cookie session+persistent 落库+loadRequest 注入 / T2.4 parseProxyConfig+HTTP 代理真实链路+SOCKS5 RFC1929 握手帧）；修复 ReadTipConfig 硬编码资源数组不忠于原版",
+    "whatImDoing": "Part 3 规则引擎完成：--rule-smoke-test 23 项断言全过（T3.1 AnalyzeRule JSoup/XPath/JSONPath/复合规则/变量 / T3.2 AnalyzeUrl {{key}}/{{page}}/{{js}}/@js/POST/headerMap 真实请求 / T3.3 RhinoScriptEngine+java 绑定+SharedJsScope CryptoJS+JsSourceEngine mainJs / T3.4 规则源+JS 源全链路）；补齐 /scripts/cryptojs.min.js 资源；忠于原版核对 analyzeRule/jsSource/com.script(JsURL 等) 全部等价",
     "blockedBy": [],
-    "nextAfterThis": "Part 3 规则引擎（T3.1 AnalyzeRule 基础 → T3.2 AnalyzeUrl → T3.3 Rhino 集成 → T3.4 联测）"
+    "nextAfterThis": "Part 4 书源与读书引擎（T4.1 SourceHelp 书源管理 → T4.2 jsSource → T4.3 WebBook → T4.4 联测）"
   },
   "parts": [
     {
@@ -71,7 +72,8 @@
     {
       "id": 3,
       "name": "规则引擎（AnalyzeRule + Rhino）",
-      "status": "todo"
+      "status": "done",
+      "note": "T3.1~T3.4 全部验收：--rule-smoke-test 23 项断言全过（JSoup/XPath/JSONPath/Regex/复合规则/变量 / AnalyzeUrl key-page-js 替换+真实请求+POST+headerMap / Rhino+java 绑定+CryptoJS+JsSourceEngine mainJs / 规则源+JS 源全链路）；补齐 scripts/cryptojs.min.js 资源"
     },
     {
       "id": 4,
@@ -194,33 +196,33 @@
       "id": "T3.1",
       "name": "AnalyzeRule 基础",
       "part": 3,
-      "status": "todo",
-      "test": "规则样例解析",
-      "testedAt": null
+      "status": "done",
+      "test": "规则样例解析：CSS 文本/属性/多元素列表、XPath 文本/属性、JSONPath 列表/自动识别、@js 复合规则、@get:{var} 变量（9 项断言）",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T3.2",
       "name": "AnalyzeUrl",
       "part": 3,
-      "status": "todo",
-      "test": "搜索 URL 构造+请求",
-      "testedAt": null
+      "status": "done",
+      "test": "搜索 URL 构造+请求：{{key}}/{{page}}/{{js}} 内嵌、@js 整段重写、,{options} POST JSON body、headerMap UA 注入（本地 HttpServer 真实链路 5 项断言）",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T3.3",
       "name": "Rhino 集成",
       "part": 3,
-      "status": "todo",
-      "test": "JS 源 mainJs 执行",
-      "testedAt": null
+      "status": "done",
+      "test": "RhinoScriptEngine 算术/函数、AnalyzeRule.evalJS java 绑定(base64Encode)、SharedJsScope CryptoJS.MD5(cryptojs.min.js 资源)、JsSourceEngine mainJs 顶层函数/NativeObject 归一化/callFunctionIfExists（7 项断言）",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T3.4",
       "name": "Part3 联测",
       "part": 3,
-      "status": "todo",
-      "test": "JS 源 + 规则源各跑通一次",
-      "testedAt": null
+      "status": "done",
+      "test": "规则源(HTML 搜索→解析书名) + JS 源(getSearchBooks+java.ajax→JSON) 各跑通一次（2 项断言）",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T4.1",
@@ -351,6 +353,12 @@
       "task": "T2.1~T2.4 (Part 2)",
       "result": "pass",
       "detail": "Part 2 配置与网络层完成：--net-smoke-test 16 项断言全过（配置读写+重启保持 / gzip+deflate+brotli 解压 / UA 注入 / Cookie session+persistent 落库+注入 / HTTP 代理真实链路 / SOCKS5 RFC1929 握手 / example.com 真实 https+br）；修复 ReadTipConfig 硬编码资源数组（对齐 values-zh/arrays.xml）；test_backend.sh 集成 4.7 段全绿"
+    },
+    {
+      "at": "2026-08-10T22:30:00+08:00",
+      "task": "T3.1~T3.4 (Part 3)",
+      "result": "pass",
+      "detail": "Part 3 规则引擎完成：--rule-smoke-test 23 项断言全过（AnalyzeRule CSS/XPath/JSONPath/复合/变量 9 项；AnalyzeUrl key/page/{{js}}/@js/POST/headerMap 真实请求 5 项；Rhino+java 绑定+CryptoJS+JsSourceEngine 7 项；规则源+JS 源全链路 2 项）；补齐 scripts/cryptojs.min.js+LICENSE（+js_source_template.js 备用）；忠于原版核对 com/script 18 文件+analyzeRule 12 文件+jsSource 7 文件+JsExtensions/SharedJsScope/EncoderUtils 全部等价（差异仅 Android 专属裁剪与 java.util.Base64 flags 语义兼容）；test_backend.sh 集成 4.8 段全绿"
     }
   ]
 }

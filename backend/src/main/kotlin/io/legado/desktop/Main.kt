@@ -51,6 +51,14 @@ fun main(args: Array<String>) {
         exitProcess(if (fails == 0) 0 else 1)
     }
 
+    // 1.8 Part3 规则引擎冒烟模式（AnalyzeRule/AnalyzeUrl/Rhino/JS 源）：跑完即退出
+    if (args.contains("--rule-smoke-test")) {
+        println("== Rule engine smoke test ==")
+        val fails = RuleSmokeTest.run()
+        println("== Rule engine smoke test result: ${if (fails == 0) "PASS" else "FAIL($fails)"} ==")
+        exitProcess(if (fails == 0) 0 else 1)
+    }
+
     // 2+3. HTTP/WS 服务
     val server = HttpApiServer(host, port)
     server.start()

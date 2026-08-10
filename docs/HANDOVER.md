@@ -220,3 +220,55 @@
 - STATUS.json 已同步（lessons 追加 11/12/13）
 - remote main 最新：本会话提交后更新
 - 下一步：**Part 3 规则引擎**（T3.1 AnalyzeRule 基础 → T3.2 AnalyzeUrl → T3.3 Rhino 集成 → T3.4 联测），详见 PLAN.md 第 4 节
+
+## 9. Part 3 规则引擎会话经验（2026-08-10，交接给下一会话）
+
+> 本会话从「读 docs → 忠于原版核对 → 补齐资源 → 编写 --rule-smoke-test 23 项断言 → 联测 → 推送」全程完成。
+> 结论：**Part 3 代码在 Part 0 时已迁移完毕且编译通过，本轮工作 = 资源补齐 + 验收测试 + 忠于原版核对**（与 Part 2 同模式）。
+
+### 9.1 本轮完成
+- 新增 `--rule-smoke-test` 入口（Main → RuleSmokeTest，23 项断言，跑完即退出）：
+  - **T3.1 AnalyzeRule 基础**（9 项）：CSS 文本/属性/多元素列表、XPath 文本/属性、JSONPath 列表/自动识别（`$.` 开头自动 Mode.Json）、复合规则 `@css:...@text@js:...`、变量 `put`+`@get:{var}`
+  - **T3.2 AnalyzeUrl**（5 项）：`{{key}}`/`{{page}}`/`{{js}}` 内嵌、`@js:` 整段重写（result 变量替换）、`,{options}` POST JSON body、headerMap UA 注入（本地 HttpServer 回显真实链路）
+  - **T3.3 Rhino 集成**（7 项）：RhinoScriptEngine 算术/函数、AnalyzeRule.evalJS java 绑定（`java.base64Encode('abc')`）、SharedJsScope CryptoJS.MD5（补资源后）、JsSourceEngine mainJs 顶层函数/NativeObject JSON 归一化/callFunctionIfExists
+  - **T3.4 联测**（2 项）：规则源（搜索 HTML→解析书名）+ JS 源（getSearchBooks + java.ajax→JSON）各跑通一次
+- 补齐资源：`scripts/cryptojs.min.js` + LICENSE（原版 assets/scripts/）+ `js_source_template.js`（Part 4 备用）
+- `tools/test_backend.sh` 集成 4.8 段
+- 提交：见 git log（Part 3 规则引擎）
+
+### 9.2 忠于原版核对（本轮重点，diff 全部通过）
+| 范围 | 结论 |
+|---|---|
+| analyzeRule 12 文件（AnalyzeByJSoup/XPath/JSonPath/Regex/RuleAnalyzer/RuleData/…） | **0 差异** |
+| AnalyzeRule.kt | 仅 30 行 diff：WebView webJs 抛 NoStackTraceException、TextUtils→isNullOrEmpty、@Keep 裁剪（等价） |
+| AnalyzeUrl.kt | 仅 66 行 diff：useWebView→false 分支、BackstageWebView→okhttp、Cronet→null、GlideUrl/MediaItem 裁剪、Base64 等价（合理裁剪） |
+| jsSource 7 文件 | 仅 LruCache→SimpleLruCache、`getString(R.string...)`→硬编码中文（等价） |
+| com/script 全部 18 文件（Rhino 引擎，原版 modules/rhino） | 几乎 0 差异；RhinoClassShutter 仅删 android.Context + SDK_INT→true；ClassNameMatcher 仅 LruCache→ConcurrentHashMap |
+| help/JsExtensions.kt | 213 行 diff 全部是 WebView/视频裁剪为抛错 + LruCache/路径等价替换（符合约束） |
+| help/JsEncodeUtils / utils/JsURL / JsonExtensions / JsoupExtensions | Base64→java.util.Base64（NO_WRAP 等价）、@Keep 裁剪、0 差异 |
+| model/SharedJsScope.kt | LruCache→SimpleLruCache、ACache→SimpleACache、assets→classpath 资源（等价） |
+| utils/EncoderUtils.kt | 64 行 diff 是 **Android Base64 flags 语义兼容实现**（DEFAULT/NO_PADDING/NO_WRAP/CRLF/URL_SAFE + 无 padding 容错），JS 书源会传 flags，必须保持 |
+
+### 9.3 本轮新踩的坑（别重踩）
+
+1. **cryptojs.min.js 资源缺失 = 静默失效（最隐蔽）**
+   `SharedJsScope.loadCryptoJs()` 用 `runCatching { getResourceAsStream(...) }` 包着，资源不存在只记 Debug 日志返回 null → `getCryptoScope` 返回 null → JS 源里所有 crypto 绑定（CryptoJS）静默不可用，**不报错**。核对方法：`grep -rn "getResourceAsStream" backend/src/main/kotlin | grep scripts` 后对照 resources/ 目录。已补 `scripts/cryptojs.min.js`（64234 字节，原版 assets 直拷）。
+
+2. **StrResponse.body 是 String?**：`au.getStrResponse().body.contains(...)` 编译错（nullable receiver），测试里要 `body ?: ""`。DAO 冒烟时 queryValue 已归一化，网络层没有。
+
+3. **const val 不能调函数**：`private const val HTML = """...""".trimIndent()` 编译错（Const initializer），改 `private val`。
+
+4. **workspace_shell 并行时序坑**：同一消息里两个工具调用并行执行时，若一个在改文件一个在编译，编译可能读到旧文件报"幽灵错误"。**先确认文件落盘（grep 核对）再单独跑编译**。
+
+### 9.4 已验证有效的方法（照用）
+
+- **规则引擎冒烟模板**：`AnalyzeRule(ruleData = RuleData(), source = BookSource(...))` + `setContent(HTML/JSON)` → `getString/getStringList`。JSON 内容 `setContent` 自动 isJSON；`$.` 开头规则自动 Mode.Json；XPath `//` 开头自动识别；`@css:选择器@text/@href`（@ 后操作符：text/ownText/html/all/任意属性名）。
+- **AnalyzeUrl 冒烟**：构造 `AnalyzeUrl(url, key=, page=, baseUrl="", source=)` → `getStrResponse()`（内部 runBlocking，可同步调）。`{{key}}`/`{{page}}` 是 JS 绑定替换；`@js:代码` 整段重写 URL（js 内用 `result` 引用原 URL）；`,{...}` options 里 method/body（JSON 字符串）在 ruleUrl 整体上先做 `{{}}` 替换。
+- **JS 源冒烟**：`BookSource(bookSourceUrl=, mainJs="function ...")` + `JsSourceEngine(source).callFunction("fn", listOf("argName" to value))`。args 绑定进 scope 既是参数也是环境变量（key/page 惯例）。
+- **CryptoJS 验证**：`SharedJsScope.getCryptoScope(this, null)` → `RhinoScriptEngine.eval("CryptoJS.MD5('abc').toString()", scope)` == `900150983cd24fb0d6963f7d28e17f72`。
+- **本地 mock**：JDK `com.sun.net.httpserver.HttpServer` 起两个（T3.2/T3.4 各一组，端口 0 随机），回显 PATH/query/UA/body，断言命中回显串。
+
+### 9.5 当前状态（2026-08-10 会话结束时）
+- Part 0/1/2/3 ✅（--rule-smoke-test 23 项断言 + test_backend.sh 全绿），STATUS.json 已同步（lessons 追加 14）
+- remote main 最新：本会话提交后更新
+- 下一步：**Part 4 书源与读书引擎**（T4.1 SourceHelp 书源管理 → T4.2 jsSource → T4.3 WebBook → T4.4 联测），详见 PLAN.md 第 5 节

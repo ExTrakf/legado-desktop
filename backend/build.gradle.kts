@@ -1,0 +1,57 @@
+plugins {
+    kotlin("jvm") version "2.4.10"
+    application
+}
+
+group = "io.legado.desktop"
+version = "0.1.0"
+
+kotlin {
+    jvmToolchain(17)
+}
+
+application {
+    mainClass.set("io.legado.desktop.MainKt")
+}
+
+// 版本对齐 legado gradle/libs.versions.toml（2026-08-10 snapshot）
+dependencies {
+    // Kotlin 标准库 / 协程
+    implementation(kotlin("stdlib"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
+
+    // HTTP/WS 服务（与 legado 一致：NanoHTTPD）
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+    implementation("org.nanohttpd:nanohttpd-websocket:2.3.1")
+
+    // 网络层（与 legado 一致）
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
+    implementation("org.brotli:dec:0.1.2")
+
+    // 规则引擎
+    implementation("org.jsoup:jsoup:1.16.2") // 不要升级，legado 有破坏性变更说明
+    implementation("com.jayway.jsonpath:json-path:3.0.0")
+    implementation("cn.wanghaomiao:JsoupXpath:2.5.3")
+
+    // JSON
+    implementation("com.google.code.gson:gson:2.14.0")
+
+    // 数据层：SQLite（替代 Android Room）
+    implementation("org.xerial:sqlite-jdbc:3.50.3.0")
+
+    // legado fork 的 Rhino JS 引擎（Maven Central 无此版本，本地 third_party）
+    implementation(files("third_party/maven/org/htmlunit/htmlunit-core-js/5.3.0-legado.3/htmlunit-core-js-5.3.0-legado.3.jar"))
+
+    // 工具
+    implementation("org.json:json:20240303")
+    implementation("cn.hutool:hutool-crypto:5.8.22")
+    implementation("org.apache.commons:commons-text:1.13.1")
+    implementation("com.github.liuyueyi.quick-chinese-transfer:quick-transfer-core:0.2.17")
+
+    testImplementation(kotlin("test"))
+}
+
+tasks.test {
+    useJUnitPlatform()
+}

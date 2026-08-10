@@ -1,0 +1,20 @@
+# Gradle
+.gradle/
+build/
+backend/build/
+backend/.gradle/
+!backend/gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.kotlin/
+
+# 运行时数据
+data/
+*.db
+*.db-journal
+
+# 系统
+.DS_Store

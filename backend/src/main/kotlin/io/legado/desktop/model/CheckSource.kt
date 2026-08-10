@@ -1,7 +1,6 @@
 package io.legado.desktop.model
 
 import io.legado.desktop.data.entities.BookSourcePart
-import io.legado.desktop.exception.NoStackTraceException
 import io.legado.desktop.help.CacheManager
 
 object CheckSource {
@@ -26,16 +25,27 @@ object CheckSource {
         sources: List<BookSourcePart>,
         sessionId: Long,
     ): String {
-        // 桌面版：校验执行逻辑（原 CheckSourceService）在 T4.1 实现
-        throw NoStackTraceException("桌面版书源校验尚未实现（T4.1）")
+        Debug.prepareCheckSession(sessionId, sources.map { it.bookSourceUrl })
+        // 原版经 IntentData 传参 + startService(CheckSourceService)；
+        // 桌面版由 CheckSourceRunner 直接驱动（等价执行逻辑，无 Service）
+        try {
+            CheckSourceRunner.start(sources, sessionId)
+        } catch (error: Exception) {
+            Debug.finishChecking(sessionId)
+            throw error
+        }
+        return "desktop:check:$sessionId"
     }
 
     fun stop(context: Any, sessionId: Long) {
-        throw NoStackTraceException("桌面版书源校验尚未实现（T4.1）")
+        if (sessionId > 0L && Debug.isChecking(sessionId)) {
+            CheckSourceRunner.cancel(sessionId)
+        }
     }
 
     fun resume(context: Any) {
-        throw NoStackTraceException("桌面版书源校验尚未实现（T4.1）")
+        // 原版：若校验进行中则刷新通知，否则 stopSelf；
+        // 桌面版无前台通知，等价为无操作（校验进度经 CheckSourceRunner 日志/EventBus 输出）
     }
 
     fun putConfig() {

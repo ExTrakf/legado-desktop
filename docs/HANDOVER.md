@@ -272,3 +272,53 @@
 - Part 0/1/2/3 ✅（--rule-smoke-test 23 项断言 + test_backend.sh 全绿），STATUS.json 已同步（lessons 追加 14）
 - remote main 最新：本会话提交后更新
 - 下一步：**Part 4 书源与读书引擎**（T4.1 SourceHelp 书源管理 → T4.2 jsSource → T4.3 WebBook → T4.4 联测），详见 PLAN.md 第 5 节
+
+## 10. Part 4 书源与读书引擎会话经验（2026-08-10，交接给下一会话）
+
+> 本会话从「读 docs → 忠于原版核对 → 实现 CheckSourceRunner（T4.1 唯一缺口）→ 编写 --source-smoke-test 18 项断言 → 修 SqlExecutor JSON 往返 → 联测 → 推送」全程完成。
+> 结论：**Part 4 代码在 Part 0 时已迁移完毕，唯一裁剪缺口是 CheckSource 校验执行（原 CheckSourceService）**；本轮工作 = 等价迁移 + 验收测试 + 发现并修复 Part 1 遗留 DAO bug。
+
+### 10.1 本轮完成
+- **CheckSourceRunner.kt**（新建）：原 `CheckSourceService`（Android Service）等价迁移 → 纯 JVM 协程 Runner。
+  - `check/checkSource/doCheckSource/checkBook/isDomainReachable/parseCheckSourceEndpoint/selectCheckSourceChapter` 业务逻辑**逐字保留**（脚本比对确认，仅 `getString(R.string.chapter_list_empty)`→"目录列表为空" 已对照 values-zh）
+  - 裁剪：BaseService/Notification/Intent/生命周期（stopSelf 等）；通知 → 日志 + postEvent 保留调用点
+  - "已有书源在校验"原版 toast+return（**不抛异常**），桌面版 LogUtils+return 等价
+  - `CheckSource.start/stop/resume` 恢复桌面实现（start 直接驱动 Runner，返回 `"desktop:check:$sessionId"`）
+- 新增 `--source-smoke-test` 入口（Main → SourceSmokeTest，18 项断言，跑完即退出）：
+  - **T4.1**（5 项）：SourceHelp 导入/启停/删除、JsSourceUpsert 保存 JS 单文件源、CheckSource 全项校验（本地 mock 规则源）→ PASSED
+  - **T4.2**（4 项）：JsSourceBook 搜索/详情/目录/正文
+  - **T4.3**（6 项）：WebBook 规则源 搜索→详情→目录→正文 全链路 + ContentProcessor 替换净化 + SearchBookShelfHelp 加书架
+  - **T4.4**（3 项）：多源搜索结果入库往返 + SearchModel 双源合并去重（origins 聚合）+ BookDao.upProgress 进度存取
+- **修复 SqlExecutor 复杂类型 JSON 往返**（Part 1 遗留，见 10.2-1）
+- `tools/test_backend.sh` 集成 4.9 段（--source-smoke-test，18 项）
+
+### 10.2 本轮新踩的坑（别重踩）
+
+1. **BookSource.rule\* 字段 JSON 往返（最隐蔽，Part 1 遗留）**
+   Room 原版用 `@TypeConverters` 把 ruleSearch/ruleToc/ruleContent/ruleBookInfo/ruleExplore/ruleReview 存为 **JSON 字符串列**。桌面版 SqlExecutor 旧实现：bind 时对复杂对象 `toString()`（存成 `SearchRule(checkKeyWord=null, ...)` 垃圾）、查询时反射无法还原（静默 null）。**后果**：`insertBookSource` 后从库 `getBookSource` 拿到的源 rule\* 全 null → 搜索/校验静默返回空（T4.1 校验"搜索失效"、T4.4 搜索空）。修复：`bindAll` 对非标量（String 外）`GSON.toJson(v)`；`convert` 复杂类型 `runCatching { GSON.fromJson(str, type) }.getOrNull()`（utils.GSON 已注册全部规则类 jsonDeserializer）。**教训：DAO 冒烟必须覆盖复杂字段往返，不能只看简单 CRUD。**
+
+2. **JsSourceUpsert.save 只接受 JS 单文件源格式，不是标准 JSON**
+   原版 web 书源（JS 源）导入格式 = `var config = {...}` + 顶层函数（search/getChapters/getContent），JsSourceConfig.extract 把文本**当 JS 执行**后取 config 对象。传 GSON.toJson(BookSource) 会报 "JS源脚本执行失败: missing ; before statement"。规则源导入走 `SourceHelp.insertBookSource(BookSource)`（实体直插），JS 源导入走 `JsSourceUpsert.save(jsText)`。
+
+3. **JS 源相对 URL 必须用 baseUrl 绑定拼绝对（测试数据坑）**
+   `java.ajax("/jssearch?key=x")` 相对路径在 JsExtensions.ajax → AnalyzeUrl(baseUrl="") 下无法请求，ajax 失败返回**异常堆栈字符串**（`runCatching.getOrElse { it.stackTraceStr }`），`JSON.parse(堆栈)` 报 `Unexpected token: j`（j=java.lang 的 j）——极易误判为 Rhino 语法问题。原版模板写法：`java.ajax(config.bookSourceUrl + "/search?...")`；JS 单文件源里用绑定 `baseUrl`（=source.getKey()）拼。**教训：JS 源测试数据一律绝对 URL；报 Unexpected token: j 先查 ajax 返回值。**
+
+4. **WebBook 各 Await 的 URL 拼接 baseUrl 不同**
+   `getBookInfoAwait` 用 baseUrl=bookSource.bookSourceUrl（相对 bookUrl 可拼）；`getChapterListAwait` 用 AnalyzeUrl(baseUrl=book.bookUrl)（bookUrl 必须是绝对，否则 tocUrl 相对拼不出）；正文 AnalyzeUrl(baseUrl=book.tocUrl)。**测试构造 Book 时 bookUrl/tocUrl 全部用绝对 URL**（真实流程里来自搜索结果=绝对）。
+
+5. **SearchModel 结果 insert 到 searchBooks 表**：搜索流程里 `appDb.searchBookDao.insert`（NOT NULL bookUrl），SearchBook 的 bookUrl 为空即报 SQLITE_CONSTRAINT_NOTNULL 且被 flow catch 吞掉（只 AppLog）→ 表现为"搜索结果为空"。先定位 insert 再查搜索。
+
+6. **Rhino 验证小工具**：htmlunit fork 包名是 `org.htmlunit.corejs.javascript`（非 org.mozilla）；API 变了（`initStandardObjects()` 返回 TopLevel、`evaluateString(VarScope,...)`、ScopeObject implements VarScope）。写 Java 复现时 cast `(VarScope) scope`。
+
+### 10.3 已验证有效的方法（照用）
+
+- **忠于原版核对 CheckSourceService**：python 大括号配对提取函数体 + 归一化（去注释/空白/包名）diff，`checkSource/isDomainReachable/doCheckSource/parseCheckSourceEndpoint` 逐字一致，`checkBook` 仅字符串等价。比人眼 diff 可靠。
+- **CheckSource 校验测试**：`Debug.tryStartCheckSession()` → `CheckSource.start(Any(), parts, sessionId)` → 轮询 `!Debug.isChecking(sessionId) && CheckSourceRunner.activeSessionId == null` → `Debug.getCheckSnapshot(sessionId, urls)` 断言 `status == CheckSourceStatus.PASSED`。checkDomain=false 走本地 mock；校验会真实改源（addGroup/respondTime 写回）。
+- **本地双 HttpServer mock 两个书源**（规则源 + JS 源，端口 0 随机），同 RuleSmokeTest 模式。
+- **JS 单文件源模板**：`var config = {bookSourceUrl, bookSourceName, bookSourceType, bookSourceGroup, lastUpdateTime}` + `search/getBookInfo/getChapters/getContent`；URL 全用 `baseUrl + "/..."`。
+- **正文替换验证**：替换在**阅读层**（ContentProcessor.getContent），不在 WebBook.getContentAwait（只取原始正文）。直接 `ContentProcessor.get(book).getContent(book, chapter, raw, includeTitle=false)` 断言。ReplaceRule 用 `scope` 字段（LIKE 书名/源）匹配，`isEnabled/isRegex/scopeContent`。
+
+### 10.4 当前状态（2026-08-10 会话结束时）
+- Part 0/1/2/3/**4** ✅（--source-smoke-test 18 项断言 + test_backend.sh 9 PASS 全绿），STATUS.json 已同步（lessons 追加 15）
+- remote main 最新：本会话提交后更新
+- 下一步：**Part 5 API 层**（T5.1 HttpServer 路由整合 → T5.2 书源/RSS/替换规则 API → T5.3 书籍 API → T5.4 WebSocket → T5.5 端到端联测），详见 PLAN.md 第 6 节

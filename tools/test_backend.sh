@@ -172,6 +172,17 @@ else
   grep "❌" /tmp/legado_rule_smoke.log | head -10
 fi
 
+# ---------- 4.9 Part4 书源与读书引擎冒烟（T4.1 SourceHelp/CheckSource + T4.2 jsSource + T4.3 WebBook + T4.4 联测） ----------
+echo "== 4.9 Part4 书源与读书引擎冒烟（--source-smoke-test） =="
+LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --source-smoke-test > /tmp/legado_source_smoke.log 2>&1
+SOURCE_EXIT=$?
+if [ $SOURCE_EXIT -eq 0 ]; then
+  ok "Part4 冒烟全部通过（$(grep -c '✅' /tmp/legado_source_smoke.log) 项断言）"
+else
+  bad "Part4 冒烟失败（exit=$SOURCE_EXIT）"
+  grep "❌" /tmp/legado_source_smoke.log | head -10
+fi
+
 # ---------- 5. 停止服务 ----------
 echo "== 5. 停止服务 =="
 if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null; echo "  killed server pid=$SERVER_PID"; fi

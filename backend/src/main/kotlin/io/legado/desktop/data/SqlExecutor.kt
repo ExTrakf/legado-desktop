@@ -1,5 +1,6 @@
 package io.legado.desktop.data
 
+import io.legado.desktop.utils.GSON
 import java.lang.reflect.Constructor
 import java.lang.reflect.Modifier
 import java.sql.Connection
@@ -93,7 +94,9 @@ object SqlExecutor {
                 is Long -> setLong(i + 1, v)
                 is Float -> setFloat(i + 1, v)
                 is Double -> setDouble(i + 1, v)
-                else -> setString(i + 1, v.toString())
+                is String -> setString(i + 1, v)
+                // 复杂类型（Room @TypeConverters 语义）：实体规则类等以 JSON 字符串存取
+                else -> setString(i + 1, GSON.toJson(v))
             }
         }
     }
@@ -221,8 +224,9 @@ object SqlExecutor {
             Double::class.java, java.lang.Double::class.java -> (value as Number).toDouble()
             Boolean::class.java, java.lang.Boolean::class.java -> (value as Number).toInt() != 0
             else -> {
-                // 复杂类型字段（如 rule 子类）以 JSON 存/取，实体侧有 Gson 转换逻辑
-                value.toString()
+                // 复杂类型字段（如 BookSource 的 rule* 子类）以 JSON 存/取：
+                // Room @TypeConverters 等价 —— GSON 已注册全部规则类的 jsonDeserializer
+                runCatching { GSON.fromJson(value.toString(), type) }.getOrNull()
             }
         }
     }

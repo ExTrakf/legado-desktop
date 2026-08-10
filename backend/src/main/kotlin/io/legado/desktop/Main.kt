@@ -59,6 +59,14 @@ fun main(args: Array<String>) {
         exitProcess(if (fails == 0) 0 else 1)
     }
 
+    // 1.9 Part4 书源与读书引擎冒烟模式（SourceHelp/CheckSource/jsSource/WebBook/SearchModel）：跑完即退出
+    if (args.contains("--source-smoke-test")) {
+        println("== Source engine smoke test ==")
+        val fails = SourceSmokeTest.run()
+        println("== Source engine smoke test result: ${if (fails == 0) "PASS" else "FAIL($fails)"} ==")
+        exitProcess(if (fails == 0) 0 else 1)
+    }
+
     // 2+3. HTTP/WS 服务
     val server = HttpApiServer(host, port)
     server.start()

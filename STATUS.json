@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T22:30:00+08:00",
+  "updatedAt": "2026-08-10T23:30:00+08:00",
   "project": "legado-desktop",
   "source": {
     "repo": "https://github.com/LegadoTeam/legado",
@@ -40,15 +40,16 @@
     "教训11：硬编码资源数组必须对照原版 values-zh/arrays.xml——ReadTipConfig 曾把 tipNames 写成\"默认/间隔/上下/左右\"（实际应为 无/书名/标题/时间/电量/电量%/页数/进度(%)），tipColorNames/tipDividerColorNames 也错写为颜色名。已修正",
     "教训12：OkHttp 走 HTTP 代理时向代理发送绝对 URI 形式请求行；本地 HttpServer 可模拟代理（返回 PROXY:uri 前缀验证请求确实经代理）。SOCKS5 验证用 mock ServerSocket 按 RFC1929 帧解析（auth 头 [01,ulen] 第二字节即 ulen，勿再 read 一次）",
     "教训13：测试断言要命中对端点——cookie 注入验证曾请求 /ua（只回显 User-Agent），永远不可能含 Cookie，误判 loadRequest 失效；应建 /cookie 端点回显请求 Cookie 头",
-    "教训14：桌面版缺 /scripts/cryptojs.min.js 资源——SharedJsScope.getCryptoScope 加载失败会静默返回 null（runCatching 吞异常），JS 源 crypto 绑定全部失效且不报错。补齐资源后 CryptoJS.MD5 可用。凡代码 getResourceAsStream('/scripts/...') 的地方必须核对资源存在（对照原版 assets/scripts/）"
+    "教训14：桌面版缺 /scripts/cryptojs.min.js 资源——SharedJsScope.getCryptoScope 加载失败会静默返回 null（runCatching 吞异常），JS 源 crypto 绑定全部失效且不报错。补齐资源后 CryptoJS.MD5 可用。凡代码 getResourceAsStream('/scripts/...') 的地方必须核对资源存在（对照原版 assets/scripts/）",
+    "教训15：BookSource 的 rule* 字段（ruleSearch/ruleToc/ruleContent/ruleBookInfo/ruleExplore/ruleReview）是 Room @TypeConverters 语义（JSON 字符串列）——旧 SqlExecutor 对复杂对象 bind 时 toString() 存垃圾、查询时反射无法还原（静默 null）。修复：bindAll 对非标量（String 外）GSON.toJson、convert 复杂类型 GSON.fromJson（GSON 已注册全部规则类 jsonDeserializer）。Part 1 DAO 冒烟未覆盖规则字段往返，T4.1 校验/T4.4 多源搜索暴露"
   ],
   "current": {
-    "part": 3,
-    "task": "T3.1~T3.4 全部完成",
+    "part": 4,
+    "task": "T4.1~T4.4 全部完成",
     "taskStatus": "done",
-    "whatImDoing": "Part 3 规则引擎完成：--rule-smoke-test 23 项断言全过（T3.1 AnalyzeRule JSoup/XPath/JSONPath/复合规则/变量 / T3.2 AnalyzeUrl {{key}}/{{page}}/{{js}}/@js/POST/headerMap 真实请求 / T3.3 RhinoScriptEngine+java 绑定+SharedJsScope CryptoJS+JsSourceEngine mainJs / T3.4 规则源+JS 源全链路）；补齐 /scripts/cryptojs.min.js 资源；忠于原版核对 analyzeRule/jsSource/com.script(JsURL 等) 全部等价",
+    "whatImDoing": "Part 4 书源与读书引擎完成：--source-smoke-test 18 项断言全过（T4.1 SourceHelp 导入/启停/删除 + JsSourceUpsert 单文件源保存 + CheckSource 全项校验 PASSED / T4.2 JS 源搜索/详情/目录/正文 / T4.3 规则源搜索→详情→目录→正文全链路 + ContentProcessor 替换净化 + SearchBookShelfHelp 加书架 / T4.4 多源搜索合并去重 + 进度存取）；修复 SqlExecutor 复杂类型 JSON 往返（教训15）；CheckSourceRunner 等价迁移 CheckSourceService",
     "blockedBy": [],
-    "nextAfterThis": "Part 4 书源与读书引擎（T4.1 SourceHelp 书源管理 → T4.2 jsSource → T4.3 WebBook → T4.4 联测）"
+    "nextAfterThis": "Part 5 API 层（T5.1 HttpServer 路由整合 → T5.2 书源/RSS/替换规则 API → T5.3 书籍 API → T5.4 WebSocket → T5.5 端到端联测）"
   },
   "parts": [
     {
@@ -78,7 +79,8 @@
     {
       "id": 4,
       "name": "书源与核心读书引擎",
-      "status": "todo"
+      "status": "done",
+      "note": "T4.1~T4.4 全部验收：--source-smoke-test 18 项断言全过（SourceHelp/CheckSource 校验/jsSource/WebBook 全链路/SearchModel 合并/进度）；CheckSourceRunner 等价迁移 CheckSourceService；修复 SqlExecutor 复杂类型 JSON 往返"
     },
     {
       "id": 5,
@@ -228,33 +230,37 @@
       "id": "T4.1",
       "name": "SourceHelp 书源管理",
       "part": 4,
-      "status": "todo",
-      "test": "导入/校验书源",
-      "testedAt": null
+      "status": "done",
+      "test": "导入/校验书源：SourceHelp 导入+启停+删除、JsSourceUpsert 保存 JS 单文件源、CheckSource 全项校验 PASSED（本地 mock 规则源）",
+      "testedAt": "2026-08-10",
+      "note": "已实现并纳入 --source-smoke-test 全量冒烟"
     },
     {
       "id": "T4.2",
       "name": "jsSource",
       "part": 4,
-      "status": "todo",
-      "test": "JS 源搜索/目录/正文",
-      "testedAt": null
+      "status": "done",
+      "test": "JS 源搜索/详情/目录/正文：JsSourceBook 四连测（baseUrl 拼绝对 URL）",
+      "testedAt": "2026-08-10",
+      "note": "已实现并纳入 --source-smoke-test 全量冒烟"
     },
     {
       "id": "T4.3",
       "name": "WebBook",
       "part": 4,
-      "status": "todo",
-      "test": "真实书源全链路",
-      "testedAt": null
+      "status": "done",
+      "test": "规则源全链路：WebBook 搜索→详情→目录→正文 + ContentProcessor 替换净化 + SearchBookShelfHelp 加书架",
+      "testedAt": "2026-08-10",
+      "note": "已实现并纳入 --source-smoke-test 全量冒烟"
     },
     {
       "id": "T4.4",
       "name": "Part4 联测",
       "part": 4,
-      "status": "todo",
-      "test": "多源搜索/进度",
-      "testedAt": null
+      "status": "done",
+      "test": "SearchModel 双源搜索合并去重（origins 聚合）+ BookDao.upProgress 进度存取 + 规则字段 JSON 持久化往返",
+      "testedAt": "2026-08-10",
+      "note": "已实现并纳入 --source-smoke-test 全量冒烟"
     },
     {
       "id": "T5.1",
@@ -359,6 +365,12 @@
       "task": "T3.1~T3.4 (Part 3)",
       "result": "pass",
       "detail": "Part 3 规则引擎完成：--rule-smoke-test 23 项断言全过（AnalyzeRule CSS/XPath/JSONPath/复合/变量 9 项；AnalyzeUrl key/page/{{js}}/@js/POST/headerMap 真实请求 5 项；Rhino+java 绑定+CryptoJS+JsSourceEngine 7 项；规则源+JS 源全链路 2 项）；补齐 scripts/cryptojs.min.js+LICENSE（+js_source_template.js 备用）；忠于原版核对 com/script 18 文件+analyzeRule 12 文件+jsSource 7 文件+JsExtensions/SharedJsScope/EncoderUtils 全部等价（差异仅 Android 专属裁剪与 java.util.Base64 flags 语义兼容）；test_backend.sh 集成 4.8 段全绿"
+    },
+    {
+      "at": "2026-08-10T23:30:00+08:00",
+      "task": "T4.1~T4.4 (Part 4)",
+      "result": "pass",
+      "detail": "Part 4 书源与读书引擎完成：--source-smoke-test 18 项断言全过（SourceHelp 导入/启停/删除；JsSourceUpsert 保存 JS 单文件源；CheckSource 全项校验规则源 PASSED——CheckSourceRunner 等价迁移原 CheckSourceService，业务逻辑逐字核对；JsSourceBook 搜索/详情/目录/正文；WebBook 规则源搜索→详情→目录→正文全链路；ContentProcessor 替换净化；SearchBookShelfHelp 加书架；SearchModel 双源合并去重；进度存取）；修复 SqlExecutor 复杂类型字段 JSON 往返（Room TypeConverters 语义，教训15）；test_backend.sh 集成 4.9 段全绿（9 PASS）"
     }
   ]
 }

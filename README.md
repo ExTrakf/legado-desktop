@@ -74,7 +74,7 @@ frontend/
 ## 移植状态
 
 - [x] 项目骨架、构建链、最小 HTTP 服务（/api/health）
-- [ ] 数据层：SQLite DAO（Room → sqlite-jdbc）
+- [x] 数据层：SQLite DAO（Room → sqlite-jdbc，**24/24 DAO 完成**，schema 对齐 Legado v99）
 - [ ] 规则引擎：AnalyzeRule / jsSource / Rhino
 - [ ] 网络层：OkHttp + Cookie + 代理
 - [ ] 书源管理 API：save/get/delete/调试 WS
@@ -82,6 +82,10 @@ frontend/
 - [ ] 本地书籍解析（TXT/EPUB/MOBI/UMD）
 - [ ] RSS、替换规则、MCP
 - [ ] 数据库 schema 与 Legado 备份导入兼容
+
+> 数据层细节：24 张实体表 + `book_sources_part` 视图（schema v99）；DAO 接口与 Legado 一致，
+> SQL 逐条对照原版 Room `@Query`；`--dao-smoke-test` 全量冒烟（24 DAO CRUD + flow +
+> collate localized + IN(:list) 展开）由 `tools/test_backend.sh` 集成验证。
 
 ## 明确不移植（初版禁用）
 

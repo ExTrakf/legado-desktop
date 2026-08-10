@@ -11,6 +11,8 @@
 ┌──────────────────────────────────────────────┐
 │  frontend/（你的前端，完全自由）                │
 │  - 可以是任何技术栈：Vue/React/Tauri/Electron  │
+│  - 规划中：composeApp/（Compose Multiplatform │
+│    桌面前端，Windows/macOS/Linux，见 Part 7）  │
 └──────────────┬───────────────────────────────┘
                │ HTTP (REST + JSON) / WebSocket / MCP
 ┌──────────────▼───────────────────────────────┐
@@ -59,14 +61,18 @@ backend/
   build.gradle.kts        # 依赖与构建
   third_party/            # legado fork 的 htmlunit-core-js（Maven Central 无此版本）
   src/main/kotlin/io/legado/desktop/
-    Main.kt               # 入口：启动/关闭服务
+    Main.kt               # 入口：启动/关闭服务 + --dao/--net/--rule-smoke-test
     env/                  # 桌面环境抽象（替代原 Android Context/appCtx）
     data/                 # SQLite DAO 层（移植自 Room DAO）
-    core/                 # 引擎（从 legado app 模块移植）
+    model/                # 引擎（analyzeRule / jsSource / webBook 等）
     api/                  # HTTP/WebSocket 控制器
+composeApp/               # 规划中：Compose Multiplatform 桌面前端（Part 7）
 docs/
   ARCHITECTURE.md         # 移植架构说明
   API.md                  # 前后端接口契约
+  PLAN.md                 # 移植规划表（Part 0~7）
+  HANDOVER.md             # 交接文档（经验与坑，会话必读）
+  WEBVIEW-COMPOSE-PLAN.md # WebView 兼容 + Compose 前端详细规划
 frontend/
   README.md               # 前端说明（你自建）
 ```
@@ -76,12 +82,11 @@ frontend/
 - [x] 项目骨架、构建链、最小 HTTP 服务（/api/health）
 - [x] 数据层：SQLite DAO（Room → sqlite-jdbc，**24/24 DAO 完成**，schema 对齐 Legado v99）
 - [x] 配置与网络层：JSON 配置系统（AppConfig/LocalConfig/SourceConfig）+ OkHttp（StrResponse/SSL/gzip/deflate/brotli 解压）+ Cookie 持久化 + HTTP/SOCKS5 代理
-- [ ] 规则引擎：AnalyzeRule / jsSource / Rhino
-- [ ] 书源管理 API：save/get/delete/调试 WS
-- [ ] 搜索/目录/正文 API + WebSocket 搜索
-- [ ] 本地书籍解析（TXT/EPUB/MOBI/UMD）
-- [ ] RSS、替换规则、MCP
-- [ ] 数据库 schema 与 Legado 备份导入兼容
+- [x] **规则引擎（Part 3）**：AnalyzeRule（CSS/XPath/JSONPath/Regex/JS 复合规则）+ AnalyzeUrl（key/page/{{js}}/@js/POST）+ Rhino（jsSource mainJs/java 绑定/CryptoJS）
+- [ ] 书源与读书引擎（Part 4）：SourceHelp / jsSource / WebBook
+- [ ] API 层（Part 5）：书源/RSS/书籍 API + WebSocket 搜索
+- [ ] 本地书籍解析（TXT/EPUB/MOBI/UMD）+ 封面/图片 + MCP + 备份导入（Part 6）
+- [ ] **WebView 兼容 + Compose Multiplatform 前端（Part 7，规划中）**
 
 > 数据层细节：24 张实体表 + `book_sources_part` 视图（schema v99）；DAO 接口与 Legado 一致，
 > SQL 逐条对照原版 Room `@Query`；`--dao-smoke-test` 全量冒烟（24 DAO CRUD + flow +
@@ -89,11 +94,29 @@ frontend/
 >
 > 配置/网络层细节：`--net-smoke-test` 冒烟（16 项断言：配置读写+重启保持、gzip/deflate/brotli 解压、
 > Cookie session+persistent 落库与请求注入、HTTP 代理真实链路、SOCKS5 RFC1929 握手、真实 https）；也由 `tools/test_backend.sh` 集成。
+>
+> 规则引擎细节：`--rule-smoke-test` 冒烟（23 项断言：JSoup/XPath/JSONPath/复合规则/变量、
+> AnalyzeUrl 真实请求、RhinoScriptEngine/java 绑定/CryptoJS、JS 源 mainJs、规则源+JS 源全链路）；也由 `tools/test_backend.sh` 集成。
+
+## Part 7：WebView 兼容 + Compose Multiplatform 前端（规划中）
+
+恢复原版被裁剪的 WebView 能力（`BackstageWebView` 后台无头执行 JS、`@webjs:` 规则、
+`AnalyzeUrl.useWebView` 分支、`JsExtensions.webView*`），并用 Compose Multiplatform
+统一管理桌面前端（Windows/macOS/Linux，除 Android 外）。详细方案见
+`docs/WEBVIEW-COMPOSE-PLAN.md`。
+
+**已确认决策（2026-08-10）**：
+- WebView 库：**KCEF**（compose-webview-multiplatform）
+- 前端：**最小可用**（书架/书源/阅读核心闭环），后续完善
+- 顺序：**分两步** —— 先引擎层（T7.1~T7.5 无头 WebView，不依赖 Compose UI），再前端（T7.6~T7.8）
+- Compose：**稳定版 1.11.x**
+- 网页登录：最小可用阶段不包含；过渡方案 = API 返回登录 URL → 系统浏览器登录 → 手动填 Cookie 到设置
 
 ## 明确不移植（初版禁用）
 
 - TTS / 朗读 / 音频播放（含 help/audio、AudioPlay、ReadAloud 等）
 - 视频播放 / 弹幕（VideoPlay、gsyVideoPlayer）
 - Android UI / 通知 / 前台服务 / 广播 / 桌面部件 / ContentProvider
-- WebView 依赖功能（部分书源 WebView 登录、BackstageWebView）
 - 应用内更新 / 崩溃统计（Firebase）
+- WebView 依赖功能：~~初版禁用~~ → **Part 7 规划中恢复**（KCEF 桌面等价实现；Android 专属
+  `addJavascriptInterface` 用 JS 注入 + `window.legadoJsBridgeResult` 回调等价替代）

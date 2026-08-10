@@ -115,3 +115,54 @@
 - 每 Task：`compileKotlin` 0 错误 + 最小验证 → 更新 STATUS.json → `git add -A && git commit`（身份已配置）→ `git push`
 - 每 Part：`tools/test_backend.sh` 全过 → STATUS.json 置 part done
 - 不要 `pkill` 乱杀；测试脚本已内置精确 PID 清理
+
+## 7. Part 1 数据层会话经验（2026-08-10，交接给下一会话）
+
+> 本会话从「读 docs → 实现剩余 21 DAO → Part 1 联测 → 推送」全程完成。
+> 以下只写**新踩的坑**和**已验证有效的方法**，既有规则（第 1/2/3/6 节）不重复。
+
+### 7.1 本轮完成
+- 24/24 DAO（21 个新 Impl，SQL 对照 legado Room @Query）
+- `--dao-smoke-test` 入口（Main → DaoSmokeTest，25 项断言）集成进 `tools/test_backend.sh`
+- 提交：`56e2b12`（Part 1 数据层）、`baf4fb5`（README 状态）—— 均已在 main
+
+### 7.2 本轮新踩的坑（别重踩）
+
+1. **SqlExecutor.bind() 字面 `?` 不绑定（最致命，静默错误）**
+   原实现只把 `:name` 转 `?` 并收集 bindArgs；SQL 里手写的 `?` 不被处理 → **参数永不绑定，查询静默返回空/写入不生效，且不报错**。T1.1 集成测试用 python 直写 SQL 掩盖了此问题，Kotlin DAO 实际从没跑通过。已修：bind() 对字面 `?` 也消耗位置参数（与 `:name` 共用 argIdx 顺序计数器）。**教训：DAO 写完必须跑真实 CRUD 冒烟断言返回值，不能只看"不抛异常"。**
+
+2. **queryList(..., String::class.java) 反射实例化失败**
+   `allGroupsUnProcessed`/`getGroupNames`/`localBookFileNames`/`findExistingSourceUrls` 等标量列表查询，对 String 反射找无参构造 → 抛 IllegalStateException。已修：toList() 遇基础类型直接取第一列标量（convertScalar）。
+
+3. **`collate localized`（Android 专属 collation）**
+   bookmarks/readRecord/highlights 的排序 SQL 用它，桌面 SQLite 无此 collation 直接报错。已用 `org.sqlite.Collation.create(conn, "localized", ...)`（大小写不敏感比较）在 SqliteDatabase.init 注册，SQL 保持原样不动。**不要**去改 SQL 删 collate。
+
+4. **`.gitignore` 的 `data/` 误忽略整个源码目录（严重）**
+   gitignore 的 `data/` pattern 匹配**任意层级** data 目录 → `backend/src/main/kotlin/io/legado/desktop/data/` 整个数据层（含此前"已完成"的 3 个 DAO）**从未被提交**，remote 上只有骨架。已修为 `/data/`（锚定仓库根）。**教训：commit 前 `git status --short | wc -l` 核对新增源码真的进库；gitignore 目录规则一律 `/xxx/` 锚定。**
+
+5. **sqlite-jdbc 3.50 标量返回类型随值大小变**
+   小值返回 Integer、大值返回 Long，`as? Int`/`as? Long` 严格转换会漏（`queryValue(..., Long::class.java)` 拿到 Integer 返回 null）。已修：queryValue 做 Number 归一化（convertScalar）。**新写标量查询放心用 queryValue，别再手写 as?。**
+
+6. **Flow<List<T>>.toList() 是 List<List<T>>**
+   DAO flow 方法（`flowAll()` 等）返回 `Flow<List<X>>`，`.toList()` 后是外层集合，断言时要 `.flatten()` 或 `.first()` 拿内层。
+
+7. **Kotlin 字符串跨行拼接会坑自动化比对**
+   `"..." + \n "..."` 拼接的 SQL，正则/脚本提取时被截断（误报差异或漏提取）。比对前先还原拼接（`re.sub(r'"\s*\+\s*$', '', t, re.M)` + 去行首 `"`），再提内容。
+
+8. **实体必填参数 → 反射无参构造**
+   Room 用构造器映射，桌面 SqlExecutor 反射要无参构造。ReadRecordBook/ReadRecordShow/RssReadRecord(record)/KeyboardAssist(key,value) 已补默认值。**后续迁移实体：无默认值的必填参数都补默认值。**
+
+### 7.3 已验证有效的方法（照用）
+
+- **DAO 冒烟模式**：`--dao-smoke-test`（Main 里 init 后跑 `DaoSmokeTest.run()` 返回失败数，`exitProcess(0/1)` 跑完即退，无需 kill）；test_backend.sh 第 4.5 节调用它并 `grep -c '✅'` 计数。冒烟要覆盖：每个 DAO insert/query/update/delete + flow 收集 + `IN(:list)` + collate localized + 外键路径。
+- **忠于原版核对三件套**（写完后必跑）：
+  1. 接口方法签名 diff：`diff <(grep -oP '(fun|val|suspend fun) \w+' impl | sort) <(...原版...)`
+  2. INSERT/UPDATE 列清单 vs schema.sql 自动化对照（还原拼接后提取，脚本见会话记录）
+  3. 递归 CTE 组过滤（ReplaceRule/RssSource/SearchBook）逐字对比
+- **测试数据唯一性**：books 有 UNIQUE(name, author)；searchBooks.origin 外键依赖 book_sources（先插源后插搜索书）；chapters.bookUrl 级联依赖 books（先插书）。冒烟里用 `System.currentTimeMillis()` 拼唯一 key。
+- **`queryValue` 选型**：Int/Long/Boolean/String 全由 convertScalar 归一化，放心传目标类型。
+
+### 7.4 当前状态（2026-08-10 会话结束时）
+- Part 0 ✅ / Part 1 ✅（24/24 DAO，冒烟全过），STATUS.json 已同步
+- remote main 最新：`baf4fb5`
+- 下一步：**Part 2 配置与网络层**（T2.1 配置系统 → T2.2 OkHttp/StrResponse/SSL/解压 → T2.3 Cookie → T2.4 代理），详见 PLAN.md 第 3 节

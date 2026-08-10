@@ -1,11 +1,13 @@
 package io.legado.desktop
 
 import io.legado.desktop.api.HttpApiServer
+import io.legado.desktop.data.DaoSmokeTest
 import io.legado.desktop.data.appDb
 import io.legado.desktop.env.DesktopEnv
 import io.legado.desktop.utils.LogUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlin.system.exitProcess
 
 /**
  * Legado Desktop 后端入口。
@@ -18,6 +20,7 @@ import kotlinx.coroutines.runBlocking
  * 参数：
  *   --port <port>   监听端口，默认 2323
  *   --host <addr>   监听地址，默认 127.0.0.1
+ *   --dao-smoke-test 数据层全量冒烟（24 DAO CRUD），跑完即退出（0=通过）
  */
 fun main(args: Array<String>) {
     val port = argValue(args, "--port")?.toIntOrNull() ?: 2323
@@ -31,6 +34,14 @@ fun main(args: Array<String>) {
     LogUtils.initFileLog(DesktopEnv.configDir)
     appDb.init()
     println("[legado-desktop] database initialized: ${DesktopEnv.dbFile}")
+
+    // 1.6 DAO 冒烟模式：跑完即退出
+    if (args.contains("--dao-smoke-test")) {
+        println("== DAO smoke test ==")
+        val fails = DaoSmokeTest.run()
+        println("== DAO smoke test result: ${if (fails == 0) "PASS" else "FAIL($fails)"} ==")
+        exitProcess(if (fails == 0) 0 else 1)
+    }
 
     // 2+3. HTTP/WS 服务
     val server = HttpApiServer(host, port)

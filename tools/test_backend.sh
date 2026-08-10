@@ -136,6 +136,17 @@ conn.close()
 print(f"  python 断言: pass={ok_fail[0]} fail={ok_fail[1]}")
 PYEOF
 
+# ---------- 4.5 DAO 冒烟（Kotlin DAO 层全量 CRUD，--dao-smoke-test 跑完即退出） ----------
+echo "== 4.5 DAO 冒烟（24 DAO CRUD + flow + collate localized + IN(:list)） =="
+LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --dao-smoke-test > /tmp/legado_dao_smoke.log 2>&1
+DAO_EXIT=$?
+if [ $DAO_EXIT -eq 0 ]; then
+  ok "DAO 冒烟全部通过（$(grep -c '✅' /tmp/legado_dao_smoke.log) 项断言）"
+else
+  bad "DAO 冒烟失败（exit=$DAO_EXIT）"
+  grep "❌" /tmp/legado_dao_smoke.log | head -10
+fi
+
 # ---------- 5. 停止服务 ----------
 echo "== 5. 停止服务 =="
 if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null; echo "  killed server pid=$SERVER_PID"; fi

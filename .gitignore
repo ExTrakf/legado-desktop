@@ -12,7 +12,7 @@ backend/.gradle/
 .kotlin/
 
 # 运行时数据
-data/
+/data/
 *.db
 *.db-journal
 

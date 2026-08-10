@@ -90,16 +90,19 @@
 ## 4. 当前状态快照（2026-08-10）
 
 - **Part 0 ✅ DONE**：编译 0 错误（8208→0，约 420 文件）、集成测试全过、installDist 5s 就绪
-- **Part 1 🔄**：基础设施（SqliteDatabase/SqlExecutor/appDb/schema v99=24表+1视图）+ **3/24 DAO**（Book/BookChapter/BookSource）✅；**剩 21 个 DAO**（appDb 中 lateinit 占位——**编译过、运行调用会抛 UninitializedPropertyAccessException**，这是下一步主线）
-- 仓库已提交 `5ffd287` 并推送
+- **Part 1 ✅ DONE**：基础设施（SqliteDatabase/SqlExecutor/appDb/schema v99=24表+1视图）+ **24/24 DAO 全部实现**（T1.2~T1.5 完成）
+  - 新增 `--dao-smoke-test` 入口（Main → DaoSmokeTest）：24 DAO 全量 CRUD + flow + collate localized + IN(:list) + 外键，25 项断言，跑完退出码汇总
+  - `tools/test_backend.sh` 已集成 DAO 冒烟段（4.5 节），集成测试全绿
+- 本轮修复的基础设施坑（详见教训 8/9/10）：
+  - `SqlExecutor.bind()` 只处理 `:name` 不处理字面 `?` → 所有 `?` 风格 DAO 参数不绑定、查询静默空返回；已修（`?` 与 `:name` 共用位置顺序计数器）
+  - `queryList(..., String::class.java)` 反射实例化失败（标量列表查询）；已修（基础类型取第一列）
+  - `collate localized`（Android 专属）桌面 SQLite 不存在；已用 `org.sqlite.Collation.create` 注册（大小写不敏感）
+  - 实体 ReadRecordBook/ReadRecordShow/RssReadRecord/KeyboardAssist 补默认值（反射无参构造适配）
 
 ## 5. 下一步（按 PLAN.md）
 
-1. **T1.2** 规则类 5 DAO：ReplaceRule(29)/TxtTocRule(12)/RuleSub(7)/DictRule(7)/HighlightRule(11)
-2. **T1.3** 书籍类 7 DAO：BookGroup(17)/Bookmark(9)/SearchBook(13)/ReadRecord(15)/Cache(6)/Cookie(6)/BookHighlight(10)
-3. **T1.4** RSS 类 5 DAO：RssSource(35)/RssArticle(9)/RssReadRecord(9)/RssStar(12)/SearchKeyword(9)
-4. **T1.5** 其他 4 DAO + Part1 全量联测（扩展 test_backend.sh 的 DAO 冒烟段）
-5. Part 2 网络层…（PLAN.md 已列）
+1. **Part 2 配置与网络层**：T2.1 配置系统验收（AppConfig/LocalConfig/SourceConfig 已改 JSON 版）→ T2.2 HTTP 客户端（OkHttp/StrResponse/SSL/解压）→ T2.3 Cookie 存储（CookieStore/CookieManager）→ T2.4 代理 + 联测
+2. Part 3 规则引擎（AnalyzeRule + Rhino）…（PLAN.md 已列）
 
 **实现 DAO 的方法**（照 BookDaoImpl 模式）：
 - SQL 对照 `backend/src/main/resources/dao-sql.json`（已从 legado 提取 272 条）+ 原文件 `/workspace/legado/app/src/main/java/io/legado/app/data/dao/`

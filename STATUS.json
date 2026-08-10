@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T12:00:00+08:00",
+  "updatedAt": "2026-08-10T12:40:00+08:00",
   "project": "legado-desktop",
   "source": {
     "repo": "https://github.com/LegadoTeam/legado",
@@ -33,24 +33,57 @@
     "教训4：sqlite-jdbc execute 不支持多语句，schema 必须按分号拆分逐条执行",
     "教训5：Room schema 的 CREATE TABLE 语句无结尾分号，生成 schema.sql 时需补 ';'",
     "教训6：表名以 Room @Entity 实际 tableName 为准（驼峰，如 rssSources/caches），不能臆测",
-    "教训7：Gradle daemon 启动慢，运行测试用 installDist 生成的直接脚本（5 秒就绪）"
+    "教训7：Gradle daemon 启动慢，运行测试用 installDist 生成的直接脚本（5 秒就绪）",
+    "教训8：SqlExecutor.bind() 原本只处理 :name，不处理字面 ?——所有 ? 风格 DAO 参数永不绑定、查询静默返回空（T1.1 集成测试用 python 直写 SQL 掩盖了此问题）。修复：bind() 对字面 ? 也消耗位置参数（与 :name 共用顺序计数器）",
+    "教训9：queryList(..., String::class.java) 反射实例化 String 抛\"无参构造\"异常（allGroupsUnProcessed 等标量列表查询全挂）。修复：toList() 对基础类型直接取第一列标量",
+    "教训10：Android SQLite 的 collate localized 桌面版不存在，Room schema 中 bookmarks/readRecord/highlights 排序用它。修复：sqlite-jdbc 3.50 提供 org.sqlite.Collation.create，在 SqliteDatabase.init 注册 localized（大小写不敏感比较），SQL 保持原样"
   ],
   "current": {
     "part": 1,
-    "task": "T1.2~T1.5（剩余 21 个 DAO 实现 + 联测）",
-    "taskStatus": "todo",
-    "whatImDoing": "Part 0 已完整完成（编译 0 错误 + 运行 + 集成测试全过）。Part 1 数据层：基础设施+3 核心 DAO 完成，剩 21 个 DAO 待实现",
+    "task": "T1.2~T1.5 全部完成",
+    "taskStatus": "done",
+    "whatImDoing": "Part 1 数据层完成：24/24 DAO 实现（含 21 个新增 Impl）+ 全量 CRUD 冒烟通过（--dao-smoke-test 25 项断言）；修复 SqlExecutor 两个基础设施 bug（? 占位符绑定、标量列表查询）；注册 localized collation；实体补默认值适配反射映射",
     "blockedBy": [],
-    "nextAfterThis": "逐个实现 21 个 DAO（对照 dao-sql.json + legado 原文件）→ Part 1 联测 → T2.x 网络层"
+    "nextAfterThis": "Part 2 配置与网络层（T2.1 配置系统验收 → T2.2 HTTP 客户端 → T2.3 Cookie → T2.4 代理）"
   },
   "parts": [
-    { "id": 0, "name": "项目基础与构建", "status": "done", "note": "T0.1/T0.2/T0.3 全部验收：编译 0 错误、服务运行、health/CORS/404/schema/外键级联测试全过" },
-    { "id": 1, "name": "数据层（SQLite 替代 Room）", "status": "in-progress", "note": "基础设施+3/24 DAO 完成；21 个 DAO 未实现（appDb lateinit 占位）" },
-    { "id": 2, "name": "配置与网络层", "status": "todo" },
-    { "id": 3, "name": "规则引擎（AnalyzeRule + Rhino）", "status": "todo" },
-    { "id": 4, "name": "书源与核心读书引擎", "status": "todo" },
-    { "id": 5, "name": "API 层（HTTP/WS/MCP）", "status": "todo" },
-    { "id": 6, "name": "本地书籍与附加功能", "status": "todo" }
+    {
+      "id": 0,
+      "name": "项目基础与构建",
+      "status": "done",
+      "note": "T0.1/T0.2/T0.3 全部验收：编译 0 错误、服务运行、health/CORS/404/schema/外键级联测试全过"
+    },
+    {
+      "id": 1,
+      "name": "数据层（SQLite 替代 Room）",
+      "status": "done",
+      "note": "24/24 DAO 实现完成；--dao-smoke-test 25 项断言全过；SqlExecutor/colllation/实体默认值修复"
+    },
+    {
+      "id": 2,
+      "name": "配置与网络层",
+      "status": "todo"
+    },
+    {
+      "id": 3,
+      "name": "规则引擎（AnalyzeRule + Rhino）",
+      "status": "todo"
+    },
+    {
+      "id": 4,
+      "name": "书源与核心读书引擎",
+      "status": "todo"
+    },
+    {
+      "id": 5,
+      "name": "API 层（HTTP/WS/MCP）",
+      "status": "todo"
+    },
+    {
+      "id": 6,
+      "name": "本地书籍与附加功能",
+      "status": "todo"
+    }
   ],
   "tasks": [
     {
@@ -89,35 +122,37 @@
       "id": "T1.2",
       "name": "DAO：书源/规则类（TxtTocRule/RuleSub/DictRule/HighlightRule/ReplaceRule）",
       "part": 1,
-      "status": "todo",
-      "note": "BookSourceDao 已实现；其余 5 个未实现",
-      "test": "CRUD 冒烟",
-      "testedAt": null
+      "status": "done",
+      "note": "已实现并纳入 --dao-smoke-test 全量冒烟",
+      "test": "CRUD 冒烟（ReplaceRule/TxtTocRule/RuleSub/DictRule/HighlightRule）全过",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T1.3",
       "name": "DAO：书籍类（BookGroup/Bookmark/SearchBook/ReadRecord/Cache/Cookie/BookHighlight）",
       "part": 1,
-      "status": "todo",
-      "note": "Book/BookChapter 已实现；其余未实现",
-      "test": "CRUD 冒烟 + 级联",
-      "testedAt": null
+      "status": "done",
+      "note": "已实现并纳入 --dao-smoke-test 全量冒烟",
+      "test": "CRUD 冒烟 + collate localized + IN(:list)（BookGroup/Bookmark/SearchBook/ReadRecord/Cache/Cookie/BookHighlight）全过",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T1.4",
       "name": "DAO：RSS 类（RssSource/RssArticle/RssReadRecord/RssStar/SearchKeyword）",
       "part": 1,
-      "status": "todo",
-      "test": "CRUD 冒烟",
-      "testedAt": null
+      "status": "done",
+      "test": "CRUD 冒烟 + read 左连接（RssSource/RssArticle/RssReadRecord/RssStar/SearchKeyword）全过",
+      "testedAt": "2026-08-10",
+      "note": "已实现并纳入 --dao-smoke-test 全量冒烟"
     },
     {
       "id": "T1.5",
       "name": "DAO：其他（Server/HttpTTS/AutoTaskRule/KeyboardAssists）+ Part1 联测",
       "part": 1,
-      "status": "todo",
-      "test": "全部 DAO 临时库全量 CRUD",
-      "testedAt": null
+      "status": "done",
+      "test": "CRUD 冒烟 + upsert + IN(:list)（Server/HttpTTS/AutoTaskRule/KeyboardAssists）+ Part1 联测 test_backend.sh 全过",
+      "testedAt": "2026-08-10",
+      "note": "已实现并纳入 --dao-smoke-test 全量冒烟"
     },
     {
       "id": "T2.1",
@@ -289,7 +324,23 @@
     }
   ],
   "testLog": [
-    { "at": "2026-08-10T08:30:00+08:00", "task": "T0.1", "result": "pass", "detail": "gradle build 2m34s" },
-    { "at": "2026-08-10T12:00:00+08:00", "task": "T0.2/T0.3/T1.1", "result": "pass", "detail": "集成测试 tools/test_backend.sh：health/CORS/404/25 表/视图/CRUD/外键级联 全部通过（工具：installDist 直接启动 5s 就绪）" }
+    {
+      "at": "2026-08-10T08:30:00+08:00",
+      "task": "T0.1",
+      "result": "pass",
+      "detail": "gradle build 2m34s"
+    },
+    {
+      "at": "2026-08-10T12:00:00+08:00",
+      "task": "T0.2/T0.3/T1.1",
+      "result": "pass",
+      "detail": "集成测试 tools/test_backend.sh：health/CORS/404/25 表/视图/CRUD/外键级联 全部通过（工具：installDist 直接启动 5s 就绪）"
+    },
+    {
+      "at": "2026-08-10T12:40:00+08:00",
+      "task": "T1.2~T1.5",
+      "result": "pass",
+      "detail": "24/24 DAO 实现 + --dao-smoke-test 25 项断言全过；tools/test_backend.sh 集成测试全绿（health/CORS/404/schema/级联/DAO 冒烟）；installDist 直接启动"
+    }
   ]
 }

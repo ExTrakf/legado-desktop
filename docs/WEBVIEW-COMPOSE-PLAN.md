@@ -100,15 +100,17 @@ legado-desktop/
 | 引擎与前端模块依赖冲突 | `backend` 保持纯 JVM（不引入 Compose）；WebView 依赖只进 `composeApp`/专用模块；无头执行若需 KCEF 则放独立模块隔离 |
 | iOS/Web target 不可行（依赖 JVM） | 计划明确只启用 Desktop(JVM)；KMP 结构预留，未来引擎替换后再扩 |
 
-## 7. 待确认决策点（需用户拍板）
+## 7. 已确认决策（2026-08-10 用户拍板）
 
-1. **WebView 库选型**：KCEF（compose-webview-multiplatform，能力全/体积大）还是 Wry（ComposeNativeWebview，体积小/beta）？→ 建议 KCEF 优先，T7.0 实测后定
-2. **前端范围**：Compose 前端做到什么程度？最小可用（书架/阅读/设置）还是对齐原版全部页面？
-3. **引擎 WebView 是否独立于前端**：`backend` 无头 WebView 功能（T7.1~T7.5）是否先做（不依赖前端），前端后续再加？→ 建议**分两步走**，先引擎后前端
-4. **Compose 版本策略**：跟随 1.11.1 稳定版（兼容矩阵需验证）还是 1.12.0-beta？
-5. **登录 UI v2 / 网页书源浏览器**：是否纳入前端 WebView 范围（原版有 WebViewActivity/WebViewLoginFragment，属 UI 层）？
-
----
+1. **WebView 库选型**：**KCEF**（compose-webview-multiplatform）优先，能力对齐 Android WebView
+2. **前端范围**：**最小可用**（书架/书源/阅读核心闭环），后续逐步完善
+3. **实施顺序**：**分两步走** —— 先引擎层（T7.1~T7.5，无头 WebView 兼容，不依赖 Compose UI），再做前端（T7.6~T7.8）
+4. **Compose 版本**：**稳定版**（1.11.x，不用 beta）
+5. **网页登录**（登录 UI v2 之外的原版 WebView 登录）：**最小可用阶段不包含**。过渡方案（已确认）：
+   - 引擎/前端提供 API：返回书源登录 URL
+   - 用户在**系统浏览器**中完成登录
+   - 登录后**手动将 Cookie 填入设置**（前端设置页表单），存回 `CookieStore`
+   - 内嵌 WebView 自动登录、自动回传 Cookie 归入**后续完善**（T7.8+ 前端 WebView 集成阶段）
 
 ## 8. 附：调研链接
 

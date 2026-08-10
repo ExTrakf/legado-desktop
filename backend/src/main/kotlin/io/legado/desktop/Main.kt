@@ -43,6 +43,14 @@ fun main(args: Array<String>) {
         exitProcess(if (fails == 0) 0 else 1)
     }
 
+    // 1.7 Part2 配置/网络冒烟模式：跑完即退出
+    if (args.contains("--net-smoke-test")) {
+        println("== Network smoke test ==")
+        val fails = NetSmokeTest.run()
+        println("== Network smoke test result: ${if (fails == 0) "PASS" else "FAIL($fails)"} ==")
+        exitProcess(if (fails == 0) 0 else 1)
+    }
+
     // 2+3. HTTP/WS 服务
     val server = HttpApiServer(host, port)
     server.start()

@@ -166,3 +166,57 @@
 - Part 0 ✅ / Part 1 ✅（24/24 DAO，冒烟全过），STATUS.json 已同步
 - remote main 最新：`baf4fb5`
 - 下一步：**Part 2 配置与网络层**（T2.1 配置系统 → T2.2 OkHttp/StrResponse/SSL/解压 → T2.3 Cookie → T2.4 代理），详见 PLAN.md 第 3 节
+
+---
+
+## 8. Part 2 配置与网络层会话经验（2026-08-10，交接给下一会话）
+
+> 本会话从「读 docs → 核对已迁移的 Part 2 代码 → 编写 --net-smoke-test 16 项断言 → 修正 ReadTipConfig → 联测 → 推送」全程完成。
+> 结论：**Part 2 代码在 Part 0/1 时已迁移完毕且编译通过，本轮工作 = 验收测试 + 忠于原版核对**。
+
+### 8.1 本轮完成
+- 新增 `--net-smoke-test` 入口（Main → NetSmokeTest，16 项断言，跑完即退出）：
+  - **T2.1 配置**：AppConfig/LocalConfig/SourceConfig 读写 + config.json 落盘重解析（重启保持）
+  - **T2.2 HTTP**：本地 HttpServer（JDK com.sun.net.httpserver）验证 StrResponse / gzip / deflate / brotli 解压 / UA 注入 + example.com 真实 https+br
+  - **T2.3 Cookie**：Set-Cookie → session(内存) + persistent(cookies 表) + loadRequest 请求头合并回显
+  - **T2.4 代理**：parseProxyConfig 解析 + HTTP 代理真实转发链路 + SOCKS5 RFC1929 握手帧 mock
+- 修复 **ReadTipConfig.kt 硬编码资源数组不忠于原版**（见 8.2-4）
+- `tools/test_backend.sh` 集成 4.7 段（node 预生成 br 字节 → --net-smoke-test）
+
+### 8.2 忠于原版核对（本轮重点，diff 全部通过）
+| 文件 | 结论 |
+|---|---|
+| OkHttpUtils / DecompressInterceptor / HttpLogInterceptor / HttpLogRecord / HttpLogSanitizer / HttpProxyConfig / Socks5Proxy / RequestMethod / OkHttpExceptionInterceptor / OkhttpUncaughtExceptionHandler | 与原版**逐字一致**（0 差异） |
+| StrResponse | 仅差 `@Keep`（Android 注解，已裁） |
+| SSLHelper | 仅 `@SuppressLint`→`@Suppress`（等价） |
+| HttpHelper | 仅裁剪 Cronet/Glide ProgressResponseBody/ReadManga.rateLimiter（明确不移植项） |
+| CookieManager / CookieStore | 仅裁剪 android.webkit 同步（applyToWebView/setWebCookie 留注释）；`TextUtils.isEmpty`→`isNullOrEmpty`（语义等价） |
+| AppConfig | 仅 `appCtx.getPrefXxx`→`getPrefXxx` + 移除 OnSharedPreferenceChangeListener/CanvasRecorder（Android 专属）；行为逐项比对无差异 |
+| LocalConfig / SourceConfig | SharedPreferences("local"/"SourceConfig") → DesktopEnv + `local_`/`SourceConfig_` 前缀（隔离语义一致） |
+| ReadBookConfig | 仅 filesDir→DesktopEnv.homeDir + Drawable/Bitmap 裁剪；bgMeanColor/textColor 等字段原版就有 |
+
+### 8.3 本轮新踩的坑
+
+1. **ReadTipConfig 硬编码资源数组必须对照原版 values-zh/arrays.xml（严重，已修）**
+   原版 `tipNames` 来自 `R.array.read_tip` = **无/书名/标题/时间/电量/电量%/页数/进度(%)**，桌面版误写为"默认/间隔/上下/左右"；`tipColorNames`（跟随内容/自定义）与 `tipDividerColorNames`（默认/跟随内容/自定义）也错写为颜色名。**教训：凡原版读 `R.array.xxx`/`getString` 的地方，桌面版硬编码必须照抄 `values-zh/arrays.xml`（或 values/strings.xml）的对应值，不能凭印象编。**
+
+2. **SOCKS5 mock 服务器解析 auth 帧（RFC1929）**
+   认证帧 `[0x01, ulen, user..., plen, pass...]` —— `auth-hdr` 第二字节就是 ulen，**不要**再 `input.read()` 一次（会读到 'u'=117 当 ulen 导致读爆超时）。原版 `Socks5Protocol.connect` 发送的帧完全正确，错在 mock。
+
+3. **断言必须命中对端点（测试自坑）**
+   Cookie 注入验证原写请求 `/ua`（只回显 User-Agent 头）→ 永远断言失败误判 loadRequest 失效；实际是端点选错。改为 `/cookie` 端点回显请求的 Cookie 头。
+
+4. **brotli 测试字节生成**：环境无 python brotli 库，但 **node 内置 `zlib.brotliCompressSync`**；test_backend.sh 用 node 预生成 `/tmp/legado-net-test/hello.txt.br`，Kotlin 从 `System.getProperty("java.io.tmpdir")` 读取（文件缺失则本地 br 断言跳过，example.com 真实 br 兜底）。
+
+### 8.4 已验证有效的方法（照用）
+
+- **本地起 HTTP 服务器测网络层**：JDK 内置 `com.sun.net.httpserver.HttpServer`（零依赖）。gzip 用 `GZIPOutputStream`；deflate 用 `DeflaterOutputStream(Deflater(level, true))`（nowrap，匹配原版 `Inflater(true)`）；br 用预生成字节。
+- **HTTP 代理模拟**：OkHttp 走 HTTP 代理时向代理发**绝对 URI 形式请求行**；HttpServer 收到后返回 `PROXY-OK:${requestURI}` 前缀即可证明请求真的经代理转发（对照：直连返回 TARGET-OK）。
+- **SOCKS5 协议验证**：mock ServerSocket 按 RFC1929 逐帧断言（greeting 05 01 02 → 选 05 02 → auth [01,ulen]+user+[plen]+pass → reply [01,00] → connect [05,01,00,03]→reply），服务器线程异常用 `AtomicReference<Throwable>` 回传主线程（否则线程内 require 失败会静默超时 15s）。
+- **`getProxyClient(proxy)` 缓存**：key 是 `ProxyConfig`（protocol/host/port/credentials），同一 proxy 串复用 client；socks5 带凭据走 `Socks5SocketFactory` + `socks5ProxyDns`（合成地址 0.0.0.0），HTTP(S) 走标准 `Proxy` + 可选 `Proxy-Authorization`。
+
+### 8.5 当前状态（2026-08-10 会话结束时）
+- Part 0 ✅ / Part 1 ✅ / **Part 2 ✅**（--net-smoke-test 16 项断言 + test_backend.sh 全绿）
+- STATUS.json 已同步（lessons 追加 11/12/13）
+- remote main 最新：本会话提交后更新
+- 下一步：**Part 3 规则引擎**（T3.1 AnalyzeRule 基础 → T3.2 AnalyzeUrl → T3.3 Rhino 集成 → T3.4 联测），详见 PLAN.md 第 4 节

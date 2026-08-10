@@ -147,6 +147,20 @@ else
   grep "❌" /tmp/legado_dao_smoke.log | head -10
 fi
 
+# ---------- 4.7 Part2 配置/网络冒烟（T2.1 配置 + T2.2 HTTP + T2.3 Cookie + T2.4 代理） ----------
+echo "== 4.7 Part2 配置/网络冒烟（--net-smoke-test） =="
+# 预生成 brotli 压缩字节（node 内置 zlib.brotliCompressSync）
+mkdir -p /tmp/legado-net-test
+node -e "const z=require('zlib');const fs=require('fs');fs.writeFileSync('/tmp/legado-net-test/hello.txt.br', z.brotliCompressSync(Buffer.from('hello brotli world 你好世界')));" 2>/dev/null && echo "  brotli 测试字节已生成" || echo "  ⚠️ node 不可用，brotli 本地测试将跳过（真实 example.com br 仍会测）"
+LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --net-smoke-test > /tmp/legado_net_smoke.log 2>&1
+NET_EXIT=$?
+if [ $NET_EXIT -eq 0 ]; then
+  ok "Part2 冒烟全部通过（$(grep -c '✅' /tmp/legado_net_smoke.log) 项断言）"
+else
+  bad "Part2 冒烟失败（exit=$NET_EXIT）"
+  grep "❌" /tmp/legado_net_smoke.log | head -10
+fi
+
 # ---------- 5. 停止服务 ----------
 echo "== 5. 停止服务 =="
 if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null; echo "  killed server pid=$SERVER_PID"; fi

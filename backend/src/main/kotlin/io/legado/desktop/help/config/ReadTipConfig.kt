@@ -21,11 +21,12 @@ object ReadTipConfig {
         none, bookName, chapterTitle, time, battery, batteryPercentage, page,
         totalProgress, totalProgress1, pageAndTotal, timeBattery, timeBatteryPercentage
     )
-    val tipNames get() = listOf("默认", "间隔", "上下", "左右")
+    // 资源数组：对齐原版 values-zh/arrays.xml（read_tip/tip_color/tip_divider_color）
+    val tipNames get() = listOf("无", "书名", "标题", "时间", "电量", "电量%", "页数", "进度(%)")
 
-    val tipColorNames get() = listOf("红色", "橙色", "黄色", "绿色", "青色", "蓝色", "紫色")
+    val tipColorNames get() = listOf("跟随内容", "自定义")
     val tipDividerColorNames
-        get() = listOf("灰色", "红色", "绿色", "蓝色")
+        get() = listOf("默认", "跟随内容", "自定义")
 
     var tipHeaderLeft: Int
         get() = ReadBookConfig.config.tipHeaderLeft

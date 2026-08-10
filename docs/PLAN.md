@@ -14,8 +14,8 @@
 
 ```
 Part 0 基础与构建（✅ DONE）
-  └─> Part 1 数据层（🔄 进行中：基础设施+3/24 DAO）
-        └─> Part 2 配置与网络层
+  └─> Part 1 数据层（✅ DONE：24/24 DAO + 冒烟全过）
+        └─> Part 2 配置与网络层（✅ DONE：--net-smoke-test 16 项断言全过）
               └─> Part 3 规则引擎（AnalyzeRule + Rhino）
                     └─> Part 4 书源与读书引擎（SourceHelp/jsSource/WebBook）
                           └─> Part 5 API 层（HTTP/WS/MCP 控制器）

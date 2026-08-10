@@ -75,8 +75,8 @@ frontend/
 
 - [x] 项目骨架、构建链、最小 HTTP 服务（/api/health）
 - [x] 数据层：SQLite DAO（Room → sqlite-jdbc，**24/24 DAO 完成**，schema 对齐 Legado v99）
+- [x] 配置与网络层：JSON 配置系统（AppConfig/LocalConfig/SourceConfig）+ OkHttp（StrResponse/SSL/gzip/deflate/brotli 解压）+ Cookie 持久化 + HTTP/SOCKS5 代理
 - [ ] 规则引擎：AnalyzeRule / jsSource / Rhino
-- [ ] 网络层：OkHttp + Cookie + 代理
 - [ ] 书源管理 API：save/get/delete/调试 WS
 - [ ] 搜索/目录/正文 API + WebSocket 搜索
 - [ ] 本地书籍解析（TXT/EPUB/MOBI/UMD）
@@ -86,6 +86,9 @@ frontend/
 > 数据层细节：24 张实体表 + `book_sources_part` 视图（schema v99）；DAO 接口与 Legado 一致，
 > SQL 逐条对照原版 Room `@Query`；`--dao-smoke-test` 全量冒烟（24 DAO CRUD + flow +
 > collate localized + IN(:list) 展开）由 `tools/test_backend.sh` 集成验证。
+>
+> 配置/网络层细节：`--net-smoke-test` 冒烟（16 项断言：配置读写+重启保持、gzip/deflate/brotli 解压、
+> Cookie session+persistent 落库与请求注入、HTTP 代理真实链路、SOCKS5 RFC1929 握手、真实 https）；也由 `tools/test_backend.sh` 集成。
 
 ## 明确不移植（初版禁用）
 

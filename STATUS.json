@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T12:40:00+08:00",
+  "updatedAt": "2026-08-10T21:35:00+08:00",
   "project": "legado-desktop",
   "source": {
     "repo": "https://github.com/LegadoTeam/legado",
@@ -36,15 +36,18 @@
     "教训7：Gradle daemon 启动慢，运行测试用 installDist 生成的直接脚本（5 秒就绪）",
     "教训8：SqlExecutor.bind() 原本只处理 :name，不处理字面 ?——所有 ? 风格 DAO 参数永不绑定、查询静默返回空（T1.1 集成测试用 python 直写 SQL 掩盖了此问题）。修复：bind() 对字面 ? 也消耗位置参数（与 :name 共用顺序计数器）",
     "教训9：queryList(..., String::class.java) 反射实例化 String 抛\"无参构造\"异常（allGroupsUnProcessed 等标量列表查询全挂）。修复：toList() 对基础类型直接取第一列标量",
-    "教训10：Android SQLite 的 collate localized 桌面版不存在，Room schema 中 bookmarks/readRecord/highlights 排序用它。修复：sqlite-jdbc 3.50 提供 org.sqlite.Collation.create，在 SqliteDatabase.init 注册 localized（大小写不敏感比较），SQL 保持原样"
+    "教训10：Android SQLite 的 collate localized 桌面版不存在，Room schema 中 bookmarks/readRecord/highlights 排序用它。修复：sqlite-jdbc 3.50 提供 org.sqlite.Collation.create，在 SqliteDatabase.init 注册 localized（大小写不敏感比较），SQL 保持原样",
+    "教训11：硬编码资源数组必须对照原版 values-zh/arrays.xml——ReadTipConfig 曾把 tipNames 写成\"默认/间隔/上下/左右\"（实际应为 无/书名/标题/时间/电量/电量%/页数/进度(%)），tipColorNames/tipDividerColorNames 也错写为颜色名。已修正",
+    "教训12：OkHttp 走 HTTP 代理时向代理发送绝对 URI 形式请求行；本地 HttpServer 可模拟代理（返回 PROXY:uri 前缀验证请求确实经代理）。SOCKS5 验证用 mock ServerSocket 按 RFC1929 帧解析（auth 头 [01,ulen] 第二字节即 ulen，勿再 read 一次）",
+    "教训13：测试断言要命中对端点——cookie 注入验证曾请求 /ua（只回显 User-Agent），永远不可能含 Cookie，误判 loadRequest 失效；应建 /cookie 端点回显请求 Cookie 头"
   ],
   "current": {
-    "part": 1,
-    "task": "T1.2~T1.5 全部完成",
+    "part": 2,
+    "task": "T2.1~T2.4 全部完成",
     "taskStatus": "done",
-    "whatImDoing": "Part 1 数据层完成：24/24 DAO 实现（含 21 个新增 Impl）+ 全量 CRUD 冒烟通过（--dao-smoke-test 25 项断言）；修复 SqlExecutor 两个基础设施 bug（? 占位符绑定、标量列表查询）；注册 localized collation；实体补默认值适配反射映射",
+    "whatImDoing": "Part 2 配置与网络层完成：--net-smoke-test 16 项断言全过（T2.1 配置读写+重启保持 / T2.2 StrResponse+gzip+deflate+brotli 解压+UA 注入+真实 https(example.com br) / T2.3 Cookie session+persistent 落库+loadRequest 注入 / T2.4 parseProxyConfig+HTTP 代理真实链路+SOCKS5 RFC1929 握手帧）；修复 ReadTipConfig 硬编码资源数组不忠于原版",
     "blockedBy": [],
-    "nextAfterThis": "Part 2 配置与网络层（T2.1 配置系统验收 → T2.2 HTTP 客户端 → T2.3 Cookie → T2.4 代理）"
+    "nextAfterThis": "Part 3 规则引擎（T3.1 AnalyzeRule 基础 → T3.2 AnalyzeUrl → T3.3 Rhino 集成 → T3.4 联测）"
   },
   "parts": [
     {
@@ -62,7 +65,8 @@
     {
       "id": 2,
       "name": "配置与网络层",
-      "status": "todo"
+      "status": "done",
+      "note": "T2.1~T2.4 全部验收：--net-smoke-test 16 项断言全过（配置/HTTP解压/Cookie/代理）；ReadTipConfig 资源数组修正；test_backend.sh 集成 4.7 段"
     },
     {
       "id": 3,
@@ -158,33 +162,33 @@
       "id": "T2.1",
       "name": "配置系统验收",
       "part": 2,
-      "status": "todo",
-      "test": "读写偏好、重启保持",
-      "testedAt": null
+      "status": "done",
+      "test": "读写偏好、重启保持（--net-smoke-test 4 项断言：AppConfig/LocalConfig/SourceConfig + config.json 落盘重解析）",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T2.2",
       "name": "HTTP 客户端（OkHttp/StrResponse/SSL/解压）",
       "part": 2,
-      "status": "todo",
-      "test": "https 请求 + brotli/gzip",
-      "testedAt": null
+      "status": "done",
+      "test": "https 请求返回 StrResponse；gzip/deflate/brotli 解压正确（本地 HttpServer + node 预生成 br + example.com 真实 br）；UA 注入",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T2.3",
       "name": "Cookie 存储",
       "part": 2,
-      "status": "todo",
-      "test": "cookie 持久化",
-      "testedAt": null
+      "status": "done",
+      "test": "cookie 持久化（Set-Cookie → session 内存 + persistent 落 cookies 表；loadRequest 请求头合并回显验证）",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T2.4",
       "name": "代理 + Part2 联测",
       "part": 2,
-      "status": "todo",
-      "test": "代理请求",
-      "testedAt": null
+      "status": "done",
+      "test": "代理请求（parseProxyConfig http/socks5/socks4/IPv6/非法；HTTP 代理真实转发链路；SOCKS5 RFC1929 握手帧 mock 验证）",
+      "testedAt": "2026-08-10"
     },
     {
       "id": "T3.1",
@@ -341,6 +345,12 @@
       "task": "T1.2~T1.5",
       "result": "pass",
       "detail": "24/24 DAO 实现 + --dao-smoke-test 25 项断言全过；tools/test_backend.sh 集成测试全绿（health/CORS/404/schema/级联/DAO 冒烟）；installDist 直接启动"
+    },
+    {
+      "at": "2026-08-10T21:35:00+08:00",
+      "task": "T2.1~T2.4 (Part 2)",
+      "result": "pass",
+      "detail": "Part 2 配置与网络层完成：--net-smoke-test 16 项断言全过（配置读写+重启保持 / gzip+deflate+brotli 解压 / UA 注入 / Cookie session+persistent 落库+注入 / HTTP 代理真实链路 / SOCKS5 RFC1929 握手 / example.com 真实 https+br）；修复 ReadTipConfig 硬编码资源数组（对齐 values-zh/arrays.xml）；test_backend.sh 集成 4.7 段全绿"
     }
   ]
 }

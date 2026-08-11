@@ -183,6 +183,17 @@ else
   grep "❌" /tmp/legado_source_smoke.log | head -10
 fi
 
+# ---------- 4.10 Part5 API 层冒烟（T5.1 路由 + T5.2 书源/RSS/替换 API + T5.3 书籍 API + T5.4 WebSocket + T5.5 端到端） ----------
+echo "== 4.10 Part5 API 层冒烟（--api-smoke-test，独立端口 2433/2434 避开主服务 2323） =="
+LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --api-smoke-test --port 2433 > /tmp/legado_api_smoke.log 2>&1
+API_EXIT=$?
+if [ $API_EXIT -eq 0 ]; then
+  ok "Part5 冒烟全部通过（$(grep -c '✅' /tmp/legado_api_smoke.log) 项断言）"
+else
+  bad "Part5 冒烟失败（exit=$API_EXIT）"
+  grep "❌" /tmp/legado_api_smoke.log | head -10
+fi
+
 # ---------- 5. 停止服务 ----------
 echo "== 5. 停止服务 =="
 if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null; echo "  killed server pid=$SERVER_PID"; fi

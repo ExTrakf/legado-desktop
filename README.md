@@ -83,8 +83,8 @@ frontend/
 - [x] 数据层：SQLite DAO（Room → sqlite-jdbc，**24/24 DAO 完成**，schema 对齐 Legado v99）
 - [x] 配置与网络层：JSON 配置系统（AppConfig/LocalConfig/SourceConfig）+ OkHttp（StrResponse/SSL/gzip/deflate/brotli 解压）+ Cookie 持久化 + HTTP/SOCKS5 代理
 - [x] **规则引擎（Part 3）**：AnalyzeRule（CSS/XPath/JSONPath/Regex/JS 复合规则）+ AnalyzeUrl（key/page/{{js}}/@js/POST）+ Rhino（jsSource mainJs/java 绑定/CryptoJS）
-- [ ] 书源与读书引擎（Part 4）：SourceHelp / jsSource / WebBook
-- [ ] API 层（Part 5）：书源/RSS/书籍 API + WebSocket 搜索
+- [x] **书源与读书引擎（Part 4）**：SourceHelp / jsSource / WebBook
+- [x] **API 层（Part 5）**：HttpServer 全路由 + WebSocket 搜索/调试 + 书源/RSS/书籍/替换规则/HTTP 日志 API
 - [ ] 本地书籍解析（TXT/EPUB/MOBI/UMD）+ 封面/图片 + MCP + 备份导入（Part 6）
 - [ ] **WebView 兼容 + Compose Multiplatform 前端（Part 7，规划中）**
 
@@ -97,6 +97,14 @@ frontend/
 >
 > 规则引擎细节：`--rule-smoke-test` 冒烟（23 项断言：JSoup/XPath/JSONPath/复合规则/变量、
 > AnalyzeUrl 真实请求、RhinoScriptEngine/java 绑定/CryptoJS、JS 源 mainJs、规则源+JS 源全链路）；也由 `tools/test_backend.sh` 集成。
+>
+> 书源/读书引擎细节：`--source-smoke-test` 冒烟（18 项断言：SourceHelp 导入/启停/删除、JsSourceUpsert、
+> CheckSource 全项校验 PASSED、jsSource 搜索/详情/目录/正文、WebBook 全链路、ContentProcessor 替换净化、
+> SearchModel 多源合并、进度存取）；也由 `tools/test_backend.sh` 集成。
+>
+> API 层细节：`--api-smoke-test` 冒烟（29 项断言：HttpServer 全路由 + CORS 预检 + 令牌保护 + 404、
+> 书源/RSS/替换规则/HTTP 日志/阅读配置 API、书籍 API 书架/目录/正文/进度、WebSocket searchBook +
+> bookSourceDebug + rssSourceDebug 结果流、导入源→搜索→加书架→目录→正文→进度端到端）；也由 `tools/test_backend.sh` 集成。
 
 ## Part 7：WebView 兼容 + Compose Multiplatform 前端（规划中）
 

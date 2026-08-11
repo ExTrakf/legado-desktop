@@ -322,3 +322,49 @@
 - Part 0/1/2/3/**4** ✅（--source-smoke-test 18 项断言 + test_backend.sh 9 PASS 全绿），STATUS.json 已同步（lessons 追加 15）
 - remote main 最新：本会话提交后更新
 - 下一步：**Part 5 API 层**（T5.1 HttpServer 路由整合 → T5.2 书源/RSS/替换规则 API → T5.3 书籍 API → T5.4 WebSocket → T5.5 端到端联测），详见 PLAN.md 第 6 节
+
+## 11. Part 5 API 层会话经验（2026-08-11，交接给下一会话）
+
+> 本会话从「读 docs → 迁移 web/HttpServer+WebSocketServer+socket/ 与 BookController/HttpLogController → 编写 --api-smoke-test 29 项断言 → 联测 → 推送」全程完成。
+> 结论：**Part 5 增量迁移 8 个文件（web/ 包 5 + api/controller 2 + ApiSmokeTest），全部编译通过；HttpApiServer 被原版 HttpServer 取代**。
+
+### 11.1 本轮完成
+- **T5.1 `web/HttpServer.kt`**（从原版迁移）：全路由（书源/RSS/替换/书籍/HTTP 日志/阅读配置/JS 源保存）+ OPTIONS CORS（带 Origin 回显）+ `x-legado-token` 令牌保护（写路由 + HTTP 日志读路由）+ 404 JSON + `/api/health`。裁剪：Review 路由、AssetsWeb 静态资源、WebService、Bitmap 分支（保留 ByteArray 分支备 T6.2）。
+- **T5.2**：HttpLogController 迁移（HttpLogStore 已在桌面版存在）；书源/RSS/替换 controller 是 Part 0 已迁，仅接路由。
+- **T5.3 `api/controller/BookController.kt`**：书架/加删书/目录 refreshToc/正文+ContentProcessor/进度/阅读配置；cover·image·addLocalBook 占位返回 "T6.x 实现"；AppWebDav/ReadBook 裁剪。
+- **T5.4 `web/WebSocketServer.kt` + `web/socket/`**：searchBook/bookSourceDebug/rssSourceDebug 三 socket，端口 = HTTP+1；令牌协议校验原版一致；`runOnIO{}` → `launch(IO){}` 等价替换。
+- **Main.kt**：HttpApiServer 删除，改 HttpServer + WebSocketServer(port+1)；新增 `--api-smoke-test`（进程内起双服务→自测→退出）。
+- **T5.5 `ApiSmokeTest.kt`**：29 项断言（HTTP 全路由 + raw socket WS 客户端 + 端到端闭环），test_backend.sh 集成 4.10 段。
+- 提交：见 git log（Part 5 API 层）
+
+### 11.2 本轮新踩的坑（别重踩）
+
+1. **原版 ReplaceRuleController.saveRule/delete 从不 setData（最易误判为 bug）**
+   成功路径返回的 ReturnData 恒 `isSuccess:false`、`errorMsg="未知错误,请联系开发者!"`（ReturnData 默认值）——这是**原版行为**（web UI 只看 getReplaceRules 列表核对），不是迁移丢失。**忠于原版不改**。测试/前端必须以列表接口核对生效状态，不能断言 isSuccess。教训16。
+
+2. **ReplaceRuleDao.delete 按主键 id 删除**
+   `DELETE FROM replace_rules WHERE id = ?`。API 客户端若只传 name/pattern（id 默认 0）→ 静默删不掉。删除前必须从库里取完整规则（含 id）回传。教训17。
+
+3. **raw socket WS 客户端必须消费 101 响应头（最隐蔽）**
+   握手响应 `HTTP/1.1 101...` 后还有 `Upgrade/Connection/Sec-WebSocket-Accept` 头到空行为止。只读状态行就返回 → 剩余头字节被当帧解析：searchBook 表现为 `Read timed out`（第一个帧是垃圾、后续无数据）、debug 表现为"收不到日志但收到假 close 帧"。教训18。
+
+4. **OPTIONS 预检的 Allow-Origin 只在带 Origin 头时回显**
+   原版 `addWebHeaders`：`origin?.let { addHeader("Access-Control-Allow-Origin", it) }`。无 Origin 的 curl/HttpClient 预检没有该头属正常。测试要模拟浏览器带 `Origin: http://localhost:5173`。JDK HttpClient 发 OPTIONS 用 `.method("OPTIONS", BodyPublishers.noBody())`（默认会变 POST）。教训19。
+
+5. **冒烟必须用全新 LEGADO_DESKTOP_HOME**
+   `saveReplaceRule` 即使 isSuccess=false 也已真实落库；上一轮残留的 `萧炎→XY` 替换规则会让下一轮 `getBookContent` 断言"萧炎"失败（ContentProcessor 已替换成 XY）。smoke 前必须 `rm -rf` 数据目录。教训20。
+
+6. **--api-smoke-test 端口与 test_backend.sh 主服务冲突**
+   Main 的 api-smoke 分支用 `--port` 绑服务器（默认 2323），与脚本已启动的主服务端口冲突 → 集成脚本传 `--port 2433`（WS 2434）避开。教训21。
+
+### 11.3 已验证有效的方法（照用）
+- **raw socket WS 客户端模板**（ApiSmokeTest.TestWsClient）：手写握手（Sec-WebSocket-Key=base64(16B)）+ 消费响应头到空行 + 掩码文本帧（0x81 + 0x80|len + 4B mask + 异或）+ 解帧（0x1 文本 / 0x8 close / 0x9 ping→回 pong）。服务端帧不掩码。
+- **WS 令牌**：`BookSourceController.jsSourceWebSocketProtocol(token)`（internal，同模块可直接调）生成 `legado.token.<base64url>`；握手头 `Sec-WebSocket-Protocol: legado, <protocol>`。
+- **端到端 mock**：单 HttpServer 起 `/search /book/1 /toc/1 /content/1 /rss.xml`；规则源 searchUrl 相对 baseUrl；WS searchBook 直接走 SearchModel（allEnabledPart），搜索完自动 close（Search finish）。
+- **NanoWSD close() 从任意线程安全**：state==OPEN 时 close() 会同步 sendFrame(close)，客户端能收到 close 帧（搜索完成、调试 state 1000 都会正常关闭）。
+- **忠于原版核对**：HttpServer/WebSocketServer/三个 socket 与 `E:\repos\legado\app\src\main\java\io\legado\app\web\` 逐字 diff，仅差 WebService/Review/AssetsWeb/Bitmap/`appCtx.getString`→硬编码中文（对照 values-zh）、`runOnIO`→`launch(IO)`。
+
+### 11.4 当前状态（2026-08-11 会话结束时）
+- Part 0/1/2/3/4/**5** ✅（--api-smoke-test 29 项断言 + dao/net/rule/source 全 PASS），STATUS.json 已同步（lessons 追加 16~21）
+- remote main 最新：本会话提交后更新
+- 下一步：**Part 6 本地书籍/封面/图片/MCP/备份**（T6.1 本地书籍解析 → T6.2 封面图片 → T6.3 MCP → T6.4 备份导入，后两项可选），详见 PLAN.md 第 7 节；BookController 中 cover/image/addLocalBook 占位与 `readContent` 本地分支待 T6.x 补全

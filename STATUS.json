@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T23:30:00+08:00",
+  "updatedAt": "2026-08-11T13:30:00+08:00",
   "project": "legado-desktop",
   "source": {
     "repo": "https://github.com/LegadoTeam/legado",
@@ -41,15 +41,21 @@
     "教训12：OkHttp 走 HTTP 代理时向代理发送绝对 URI 形式请求行；本地 HttpServer 可模拟代理（返回 PROXY:uri 前缀验证请求确实经代理）。SOCKS5 验证用 mock ServerSocket 按 RFC1929 帧解析（auth 头 [01,ulen] 第二字节即 ulen，勿再 read 一次）",
     "教训13：测试断言要命中对端点——cookie 注入验证曾请求 /ua（只回显 User-Agent），永远不可能含 Cookie，误判 loadRequest 失效；应建 /cookie 端点回显请求 Cookie 头",
     "教训14：桌面版缺 /scripts/cryptojs.min.js 资源——SharedJsScope.getCryptoScope 加载失败会静默返回 null（runCatching 吞异常），JS 源 crypto 绑定全部失效且不报错。补齐资源后 CryptoJS.MD5 可用。凡代码 getResourceAsStream('/scripts/...') 的地方必须核对资源存在（对照原版 assets/scripts/）",
-    "教训15：BookSource 的 rule* 字段（ruleSearch/ruleToc/ruleContent/ruleBookInfo/ruleExplore/ruleReview）是 Room @TypeConverters 语义（JSON 字符串列）——旧 SqlExecutor 对复杂对象 bind 时 toString() 存垃圾、查询时反射无法还原（静默 null）。修复：bindAll 对非标量（String 外）GSON.toJson、convert 复杂类型 GSON.fromJson（GSON 已注册全部规则类 jsonDeserializer）。Part 1 DAO 冒烟未覆盖规则字段往返，T4.1 校验/T4.4 多源搜索暴露"
+    "教训15：BookSource 的 rule* 字段（ruleSearch/ruleToc/ruleContent/ruleBookInfo/ruleExplore/ruleReview）是 Room @TypeConverters 语义（JSON 字符串列）——旧 SqlExecutor 对复杂对象 bind 时 toString() 存垃圾、查询时反射无法还原（静默 null）。修复：bindAll 对非标量（String 外）GSON.toJson、convert 复杂类型 GSON.fromJson（GSON 已注册全部规则类 jsonDeserializer）。Part 1 DAO 冒烟未覆盖规则字段往返，T4.1 校验/T4.4 多源搜索暴露",
+    "教训16：原版 ReplaceRuleController.saveRule/delete 成功路径从不 setData（ReturnData.isSuccess 恒 false，errorMsg 为默认\"未知错误\"）——这是原版行为而非迁移丢失，忠于原版不改；客户端（前端/测试）应以 getReplaceRules 列表核对生效状态",
+    "教训17：ReplaceRuleDao.delete 按主键 id 删除（DELETE WHERE id=?），API 客户端必须把库里完整规则（含 id）回传才能删除——缺 id 默认 0 会静默删不掉",
+    "教训18：raw socket 做 WebSocket 客户端时，101 握手响应除状态行外还有响应头，必须读到空行才结束——否则剩余头字节会被当帧解析（searchBook 表现为超时、debug 表现为收不到日志但收到\"假 close 帧\"）",
+    "教训19：NanoHTTPD 的 OPTIONS 预检仅在请求带 Origin 头时回显 Access-Control-Allow-Origin（addWebHeaders 逻辑），无 Origin 就没有该头——测试要模拟浏览器带 Origin；JDK HttpClient 发 OPTIONS 要显式 .method(\"OPTIONS\", noBody())",
+    "教训20：Part5 冒烟必须在全新 LEGADO_DESKTOP_HOME 下运行——saveReplaceRule 即使 isSuccess=false 也已真实落库，上一轮残留的\"萧炎→XY\"替换规则会让下一轮 getBookContent 断言\"萧炎\"失败（ContentProcessor 已替换）；smoke 前必须 rm -rf 数据目录",
+    "教训21：--api-smoke-test 启动的服务器绑定 Main 解析的 --port，与 test_backend.sh 主服务端口冲突——集成脚本里用 --port 2433 独立端口避开"
   ],
   "current": {
-    "part": 4,
-    "task": "T4.1~T4.4 全部完成",
+    "part": 5,
+    "task": "T5.1~T5.5 全部完成",
     "taskStatus": "done",
-    "whatImDoing": "Part 4 书源与读书引擎完成：--source-smoke-test 18 项断言全过（T4.1 SourceHelp 导入/启停/删除 + JsSourceUpsert 单文件源保存 + CheckSource 全项校验 PASSED / T4.2 JS 源搜索/详情/目录/正文 / T4.3 规则源搜索→详情→目录→正文全链路 + ContentProcessor 替换净化 + SearchBookShelfHelp 加书架 / T4.4 多源搜索合并去重 + 进度存取）；修复 SqlExecutor 复杂类型 JSON 往返（教训15）；CheckSourceRunner 等价迁移 CheckSourceService",
+    "whatImDoing": "Part 5 API 层完成：--api-smoke-test 29 项断言全过（T5.1 HttpServer 路由整合+CORS+令牌校验+404 / T5.2 书源/RSS/替换规则/HTTP日志 API / T5.3 书籍 API 书架/目录/正文/进度/阅读配置 / T5.4 WebSocket searchBook+bookSourceDebug+rssSourceDebug 结果流 / T5.5 导入源→WS搜索→加书架→目录→正文→进度端到端）；HttpLogController 迁移；WebSocket 服务 port+1 与原版一致",
     "blockedBy": [],
-    "nextAfterThis": "Part 5 API 层（T5.1 HttpServer 路由整合 → T5.2 书源/RSS/替换规则 API → T5.3 书籍 API → T5.4 WebSocket → T5.5 端到端联测）"
+    "nextAfterThis": "Part 6 本地书籍/封面/图片/MCP/备份（T6.1 本地书籍解析 → T6.2 封面图片 → T6.3 MCP → T6.4 备份导入，后两项可选）"
   },
   "parts": [
     {
@@ -85,7 +91,8 @@
     {
       "id": 5,
       "name": "API 层（HTTP/WS/MCP）",
-      "status": "todo"
+      "status": "done",
+      "note": "T5.1~T5.5 全部验收：--api-smoke-test 29 项断言全过（HttpServer 全路由+CORS+令牌校验+404 / 书源/RSS/替换/HTTP日志/阅读配置 API / 书籍 API 书架/目录/正文/进度 / WebSocket searchBook+双调试结果流 / 端到端闭环）；WebSocket port+1；HttpLogController 迁移；MCP 留待 T6.3"
     },
     {
       "id": 6,
@@ -266,41 +273,46 @@
       "id": "T5.1",
       "name": "HTTP 路由整合（HttpServer）",
       "part": 5,
-      "status": "todo",
-      "test": "路由与 api.md 一致",
-      "testedAt": null
+      "status": "done",
+      "test": "路由与 api.md 一致（29 项断言全过：health/CORS 预检带 Origin/404/令牌保护/全部 POST+GET 路由）",
+      "testedAt": "2026-08-11",
+      "note": "HttpServer 从原版迁移（web/HttpServer.kt），裁 Review 路由/AssetsWeb 静态资源/WebService；保留 /api/health；已纳入 --api-smoke-test"
     },
     {
       "id": "T5.2",
       "name": "书源/RSS/替换规则 API",
       "part": 5,
-      "status": "todo",
-      "test": "curl 全通过",
-      "testedAt": null
+      "status": "done",
+      "test": "curl 全通过（save/get/delete 书源、RSS 源、替换规则、HTTP 日志、JS 源保存令牌校验）",
+      "testedAt": "2026-08-11",
+      "note": "HttpLogController 迁移；ReplaceRuleController save/delete 不 setData 为原版行为（教训16）"
     },
     {
       "id": "T5.3",
       "name": "书籍 API",
       "part": 5,
-      "status": "todo",
-      "test": "curl 冒烟",
-      "testedAt": null
+      "status": "done",
+      "test": "curl 冒烟（书架/加删书/目录 refreshToc/正文+ContentProcessor/进度落库/阅读配置）",
+      "testedAt": "2026-08-11",
+      "note": "BookController 迁移；cover/image 路由已挂返回 T6.2 占位；addLocalBook 占位 T6.1；AppWebDav/ReadBook 裁剪"
     },
     {
       "id": "T5.4",
       "name": "WebSocket（搜索/调试）",
       "part": 5,
-      "status": "todo",
-      "test": "WS 结果流",
-      "testedAt": null
+      "status": "done",
+      "test": "WS 结果流（searchBook 收到搜索结果帧 + bookSourceDebug/rssSourceDebug 收到步骤日志流并正常关闭）",
+      "testedAt": "2026-08-11",
+      "note": "WebSocketServer + 3 个 socket 类从原版迁移；端口 = HTTP+1；令牌协议校验原版一致；runOnIO→launch(IO) 等价"
     },
     {
       "id": "T5.5",
       "name": "Part5 端到端联测",
       "part": 5,
-      "status": "todo",
-      "test": "导入源→搜索→书架→目录→正文→进度",
-      "testedAt": null
+      "status": "done",
+      "test": "导入源→搜索→加书架→目录→正文→进度 全闭环；test_backend.sh 集成 4.10 段（--api-smoke-test --port 2433）",
+      "testedAt": "2026-08-11",
+      "note": "本地 mock 规则源 + RSS 源，raw socket WS 客户端（教训18）"
     },
     {
       "id": "T6.1",
@@ -371,6 +383,12 @@
       "task": "T4.1~T4.4 (Part 4)",
       "result": "pass",
       "detail": "Part 4 书源与读书引擎完成：--source-smoke-test 18 项断言全过（SourceHelp 导入/启停/删除；JsSourceUpsert 保存 JS 单文件源；CheckSource 全项校验规则源 PASSED——CheckSourceRunner 等价迁移原 CheckSourceService，业务逻辑逐字核对；JsSourceBook 搜索/详情/目录/正文；WebBook 规则源搜索→详情→目录→正文全链路；ContentProcessor 替换净化；SearchBookShelfHelp 加书架；SearchModel 双源合并去重；进度存取）；修复 SqlExecutor 复杂类型字段 JSON 往返（Room TypeConverters 语义，教训15）；test_backend.sh 集成 4.9 段全绿（9 PASS）"
+    },
+    {
+      "at": "2026-08-11T13:30:00+08:00",
+      "task": "T5.1~T5.5 (Part 5)",
+      "result": "pass",
+      "detail": "Part 5 API 层完成：--api-smoke-test 29 项断言全过（T5.1 HttpServer 迁移 web/HttpServer.kt 全路由 + CORS 预检带 Origin 回显 + 令牌保护 + 404 + /api/health；T5.2 书源/RSS/替换规则/HTTP 日志 API 增删改查 + HttpLogController 迁移；T5.3 BookController 迁移书架/加删书/目录 refreshToc/正文+ContentProcessor/进度/阅读配置，cover·image·addLocalBook 占位标注 T6.x；T5.4 WebSocketServer + searchBook/bookSourceDebug/rssSourceDebug 三 socket 迁移，searchBook 收到搜索结果帧、双调试收到步骤日志流并正常关闭；T5.5 导入源→WS 搜索→加书架→目录→正文→进度端到端闭环）；raw socket WS 客户端（消费 101 响应头，教训18）；ReplaceRuleController 不 setData 确认为原版行为不改（教训16）；test_backend.sh 集成 4.10 段（--api-smoke-test --port 2433 避开主服务端口）"
     }
   ]
 }

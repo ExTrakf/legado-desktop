@@ -1,10 +1,11 @@
 package io.legado.desktop
 
-import io.legado.desktop.api.HttpApiServer
 import io.legado.desktop.data.DaoSmokeTest
 import io.legado.desktop.data.appDb
 import io.legado.desktop.env.DesktopEnv
 import io.legado.desktop.utils.LogUtils
+import io.legado.desktop.web.HttpServer
+import io.legado.desktop.web.WebSocketServer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlin.system.exitProcess
@@ -21,6 +22,7 @@ import kotlin.system.exitProcess
  *   --port <port>   监听端口，默认 2323
  *   --host <addr>   监听地址，默认 127.0.0.1
  *   --dao-smoke-test 数据层全量冒烟（24 DAO CRUD），跑完即退出（0=通过）
+ *   --api-smoke-test Part5 API 层冒烟（HTTP 全路由 + WebSocket 结果流 + 端到端），跑完即退出（0=通过）
  */
 fun main(args: Array<String>) {
     val port = argValue(args, "--port")?.toIntOrNull() ?: 2323
@@ -67,14 +69,32 @@ fun main(args: Array<String>) {
         exitProcess(if (fails == 0) 0 else 1)
     }
 
+    // 1.10 Part5 API 层冒烟模式（HTTP 全路由 + WebSocket 结果流 + 端到端）：启动服务后自测，跑完即退出
+    if (args.contains("--api-smoke-test")) {
+        println("== Part5 API smoke test ==")
+        val httpServer = HttpServer(port)
+        val wsServer = WebSocketServer(port + 1)
+        httpServer.start()
+        wsServer.start(30_000) // 与原版一致：通信超时 30s
+        println("[legado-desktop] api-smoke-test servers listening on http://$host:$port (ws +1)")
+        val fails = ApiSmokeTest.run(httpPort = port, wsPort = port + 1)
+        httpServer.stop()
+        wsServer.stop()
+        println("== Part5 API smoke test result: ${if (fails == 0) "PASS" else "FAIL($fails)"} ==")
+        exitProcess(if (fails == 0) 0 else 1)
+    }
+
     // 2+3. HTTP/WS 服务
-    val server = HttpApiServer(host, port)
+    val server = HttpServer(port)
+    val wsServer = WebSocketServer(port + 1)
     server.start()
-    println("[legado-desktop] backend listening on http://$host:$port")
+    wsServer.start(30_000)
+    println("[legado-desktop] backend listening on http://$host:$port (ws $host:${port + 1})")
 
     Runtime.getRuntime().addShutdownHook(
         Thread {
             server.stop()
+            wsServer.stop()
             println("[legado-desktop] backend stopped")
         }
     )

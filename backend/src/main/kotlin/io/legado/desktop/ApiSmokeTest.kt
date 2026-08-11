@@ -305,10 +305,10 @@ object ApiSmokeTest {
         fun check(name: String, block: () -> Unit) {
             try {
                 block()
-                println("  ✅ $name")
+                println("  [PASS] $name")
             } catch (e: Throwable) {
                 fail++
-                println("  ❌ $name -> ${e.message}")
+                println("  [FAIL] $name -> ${e.message}")
             }
         }
 

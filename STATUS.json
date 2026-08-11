@@ -14,7 +14,7 @@
       "TTS/朗读/音频播放",
       "视频播放/弹幕",
       "Android UI / 通知 / 前台服务 / 广播 / 桌面部件 / ContentProvider",
-      "WebView 依赖功能（BackstageWebView、WebView 登录、webkit Cookie、登录 UI v2 渲染）",
+      "WebView 登录 UI 渲染（ui/login/WebViewLoginFragment）、RSS 可见 WebView、webkit Cookie 同步（桌面纯 HTTP Cookie）",
       "应用更新 / 崩溃统计（Firebase / CrashHandler）",
       "Glide 图片加载（改用 OkHttp + 文件读）"
     ],
@@ -53,15 +53,23 @@
     "教训24：桌面版 PDF 依赖 Android PdfRenderer 无 JVM 等价 → PdfFile 以 stub 抛 NoStackTraceException 标注裁剪；计划明确只做 TXT/EPUB/MOBI/UMD",
     "教训25：本地书籍依赖 vendored 库（me.ag2s.epublib/umdlib + io.legado.app.lib.mobi）——Android 依赖面仅 Log/Base64/Build/NonNull/PFD/SparseArray/Pools.SynchronizedPool；AndroidZipFile 用 RandomAccessFile 重写（zip 算法逐字保留，含原版 filepos+=len 语义）；mobi 的 PDBFile 用 FileChannel；SparseArray/Pools 做桌面等价类",
     "教训26：Legado 备份的 config.xml 是 Android SharedPreferences XML（<map><string name=\"k\">v</string>...），桌面用 PrefsXml 读写等价；servers.json 用 hutool AES(Base64) 加密；导出→清库→恢复→断言数据一致是最直接的忠于原版验证",
-    "教训27：DesktopEnv 需提供 allPrefs()/putPrefRaw()（typed 偏好导出/导入）才能做 config.xml 兼容；JS 书源令牌（webDavPassword）在备份中走 AES 加密"
+    "教训27：DesktopEnv 需提供 allPrefs()/putPrefRaw()（typed 偏好导出/导入）才能做 config.xml 兼容；JS 书源令牌（webDavPassword）在备份中走 AES 加密",
+    "教训28：禁止在任何代码/脚本/文档输出中使用 emoji（✅❌⚠️等）与非 UTF-8 字符——Windows 控制台默认 GBK 会把 UTF-8 emoji 显示成乱码/替换符，且 test_backend.sh 的 grep -c '✅' 断言计数会失效。冒烟输出统一用 ASCII 标记 [PASS]/[FAIL]/[SKIP]；源文件一律 UTF-8 无 BOM。Part 7 起已把 7 个冒烟测试 + test_backend.sh 全部从 emoji 迁移到 [PASS]/[FAIL]/[SKIP]",
+    "教训29：外部库选型必须核实维护状态——规划文档（2026-08-10）选的 KCEF（DatL4g）实际 2025-10-28 已归档、README 明示不推荐、最后版本停在 2023.10.11.1；compose-webview-multiplatform 又依赖 Compose UI（需 composable 渲染）与其底层已归档 KCEF。引擎层改选 JCEF 直连（chromiumembedded/java-cef）+ backend 直接引入（用户拍板）",
+    "教训30：runBlocking 单线程事件循环被 busy-wait 阻塞——runBlocking 的 async 调度的协程要等主协程挂起才执行，Thread.sleep 型 waitUntil 不挂起导致协程永不启动（getStrResponse 永远不跑、fake 无任何调用）。修复：挂起调用用 CoroutineScope(Dispatchers.Default).async 跑独立线程池，再 await",
+    "教训31：internal 类型跨包引用必须显式 import——WebViewRequestConfig 是 help.webView 的 internal data class，BackstageWebView（help.http）引用其类型/扩展函数时必须 import，否则 Unresolved reference",
+    "教训32：lambda 赋值给属性时 return@属性名 标签非法——onPageFinished = { url -> if(...) return@onPageFinished } 编译报 Unresolved label；属性名不是 lambda 标签，改 if/else 结构（语义等价）",
+    "教训33：桌面 evaluateJavascript 结果回调是 String?（Android ValueCallback 非空）——BackstageWebView.handleResult 用 it ?: \"null\" 保证空值走 retry 分支（语义等价）"
   ],
   "current": {
-    "part": 6,
-    "task": "T6.1~T6.3 全部完成",
-    "taskStatus": "done",
-    "whatImDoing": "Part 6 本地书籍/封面图片/备份导入完成：--local-smoke-test 全过（T6.1 localBook 全量迁移 TXT/EPUB/MOBI/UMD + vendored me.ag2s.epublib/umdlib + lib.mobi + addLocalBook/refreshToc 本地分支 + BookHelp.readContent 本地正文 / T6.2 ImageUtils 解密 + ImageProvider 字节化 + BookCover 纯逻辑 + BookController.getCover/getImg 返回字节 + BookHelp.saveImage 接解密 / T6.3 Backup 导出 + Restore 导入（config.xml 兼容 + AES + fixture 导入））；P5 忠于原版核对并修复 SearchScope 分歧；MCP 明确不移植已从全部文档删除",
-    "blockedBy": [],
-    "nextAfterThis": "Part 7 WebView 兼容 + Compose Multiplatform 前端（T7.1~T7.8，详见 docs/WEBVIEW-COMPOSE-PLAN.md；先引擎层后前端）"
+    "part": 7,
+    "task": "T7.1~T7.5 引擎层 WebView 兼容（纯代码，JCEF 接入待 T7.0 验证）",
+    "taskStatus": "in_progress",
+    "whatImDoing": "Part 7 引擎层：KCEF 已废弃（2025-10-28 归档），选型改为 JCEF 直连 + backend 直接引入；T7.1 WebViewRequestConfig/PooledWebView 逐字迁移 + DesktopWebView 抽象（JCEF 接缝）；T7.2 WebViewPool 复用池 + 清理协程（逻辑逐字）；T7.3 WebJsExtensions request 分发逐字 + RssJsExtensions 桌面基类 + JS 桥往返；T7.4 BackstageWebView 编排（sourceRegex/overrideUrlRegex/delayTime/timeout/cacheFirst/isRule）；T7.5 解除 AnalyzeRule.getWebJsResult/AnalyzeUrl.useWebView/JsExtensions.webView* 裁剪；--webview-smoke-test 11 项断言（Fake DesktopWebView 驱动纯逻辑）全过；JCEF 真实浏览器（offscreen 加载/executeJavaScript/JS 桥）断言与依赖下载后置到 T7.0 验证步骤",
+    "blockedBy": [
+      "JCEF 依赖引入 + Chromium bundle 下载 + offscreen 最小加载验证（T7.0，需真实环境验证，不能编造）"
+    ],
+    "nextAfterThis": "T7.0 落地：backend 引入 JCEF（jcefmaven/org.cef 坐标核实）→ 配置 DesktopWebViewFactory.creator 为 JCEF 实现 → offscreen 最小加载/executeJavaScript 真实验证 → 追加 --webview-smoke-test 真实浏览器段 → 再做 Compose 前端（T7.6~T7.8）"
   },
   "parts": [
     {
@@ -105,6 +113,12 @@
       "name": "本地书籍与附加功能",
       "status": "done",
       "note": "T6.1~T6.3 全部验收：--local-smoke-test 全过（TXT/EPUB/MOBI/UMD 解析 + vendored epublib/umdlib/mobi / 封面图片字节 + ImageUtils 解密 / 备份导出+导入 config.xml 兼容）；MCP 明确不移植已删除"
+    },
+    {
+      "id": 7,
+      "name": "WebView 兼容（引擎层）+ Compose Multiplatform 前端",
+      "status": "in_progress",
+      "note": "T7.1~T7.5 引擎层纯代码完成（JCEF 直连选型取代已废弃的 KCEF；--webview-smoke-test 11 项断言 [PASS]）；T7.0 JCEF 接入与 offscreen 真实验证、T7.6~T7.8 Compose 前端待做；冒烟输出统一 ASCII [PASS]/[FAIL]/[SKIP]（教训28）"
     }
   ],
   "tasks": [
@@ -347,6 +361,87 @@
       "test": "导入 Legado 备份（导出→清库→恢复→数据一致；手写 Legado fixture 导入）",
       "testedAt": "2026-08-11",
       "note": "Backup 导出 + Restore 导入（config.xml SharedPreferences XML 兼容 + servers AES + fixture 导入）；AppWebDav/视频/主题/调度裁剪"
+    },
+    {
+      "id": "T7.0",
+      "name": "JCEF 接入与 offscreen 最小加载验证",
+      "part": 7,
+      "status": "pending",
+      "test": "最小程序能 offscreen 加载 HTML 并 executeJavaScript 取回结果（真实浏览器验证，需下载 Chromium bundle）",
+      "testedAt": "",
+      "note": "原规划 KCEF 已于 2025-10-28 归档废弃（维护者明示不推荐），compose-webview 又依赖 Compose UI 与已归档 KCEF；用户拍板改 JCEF 直连 + backend 直接引入。本任务需真实环境验证（下载 jcef bundle ~100-200MB + 配置 DesktopWebViewFactory.creator + 追加 --webview-smoke-test 真实浏览器断言），不能编造"
+    },
+    {
+      "id": "T7.1",
+      "name": "WebViewRequestConfig + PooledWebView 等价迁移",
+      "part": 7,
+      "status": "done",
+      "test": "--webview-smoke-test T7.1 2 项断言（UA 精确/忽略大小写/回落 + additionalHeaders 排除 UA/CookieJar）；diff 与原版逐字一致",
+      "testedAt": "2026-08-11",
+      "note": "WebViewRequestConfig 逐字迁移（diff IDENTICAL）；PooledWebView 桌面版包装 DesktopWebView；新增 DesktopWebView 抽象（JCEF 接缝，线程约束/事件回调/JS 桥契约）"
+    },
+    {
+      "id": "T7.2",
+      "name": "WebViewPool 桌面版",
+      "part": 7,
+      "status": "done",
+      "test": "--webview-smoke-test T7.2 断言（acquire 创建/释放回池/池满销毁/复用不新建）；diff 与原版 acquire/startCleanupTimer 逐字一致",
+      "testedAt": "2026-08-11",
+      "note": "复用池逻辑逐字保留（idlePool/inUsePool/CACHED_WEB_VIEW_MAX_NUM/IDLE_TIME_OUT/30s 清理协程）；仅裁剪 Android View 操作与 Dispatchers.Main→Default；新增 resetForTest 测试接缝与 DesktopWebViewFactory"
+    },
+    {
+      "id": "T7.3",
+      "name": "WebJsExtensions JS 桥",
+      "part": 7,
+      "status": "done",
+      "test": "--webview-smoke-test T7.3 4 项断言（run/getStringAwait 成功路径 JSBridgeResult(true)、缺参/未知 funName 错误路径 JSBridgeResult(false) + CacheManager 往返）；request() 分发 diff 逐字一致",
+      "testedAt": "2026-08-11",
+      "note": "request funName 分发 + JS_INJECTION/JS_INJECTION2/basicJs/名称 全部逐字保留；activity/lifecycleScope 裁剪，往返通道改 DesktopWebView.evaluateJavascript；新增桌面 RssJsExtensions 基类（UI 裁剪，analyzeRule 仅绑定 source）"
+    },
+    {
+      "id": "T7.4",
+      "name": "BackstageWebView 桌面版",
+      "part": 7,
+      "status": "done",
+      "test": "--webview-smoke-test T7.4 4 项断言（html+js 返回 JS 结果 / sourceRegex 资源匹配 / overrideUrlRegex 跳转拦截 / 超时 TimeoutCancellationException）",
+      "testedAt": "2026-08-11",
+      "note": "编排逻辑逐字保留（getStrResponse 超时+取消/retry 重试/redirect buildStrResponse）；WebViewClient/WebChromeClient→DesktopWebView 回调；Handler→DesktopHandler；setCookie 用桌面 CookieStore；真实浏览器段待 T7.0"
+    },
+    {
+      "id": "T7.5",
+      "name": "解除调用点裁剪",
+      "part": 7,
+      "status": "done",
+      "test": "compileKotlin 0 错误；--webview-smoke-test 全过",
+      "testedAt": "2026-08-11",
+      "note": "AnalyzeRule.getWebJsResult（webJs）、AnalyzeUrl.executeStrRequest useWebView 分支（if(false)→原版条件）、JsExtensions.webView/webViewGetSource/webViewGetOverrideUrl 全部恢复原版逻辑；实际执行需 JCEF 接入（T7.0）"
+    },
+    {
+      "id": "T7.6",
+      "name": "Compose MP 工程骨架",
+      "part": 7,
+      "status": "pending",
+      "test": "./gradlew :composeApp:run 出窗口，调通 backend API",
+      "testedAt": "",
+      "note": ""
+    },
+    {
+      "id": "T7.7",
+      "name": "Compose 前端（书架/书源/阅读）",
+      "part": 7,
+      "status": "pending",
+      "test": "端到端：导入书源→搜索→阅读→进度",
+      "testedAt": "",
+      "note": ""
+    },
+    {
+      "id": "T7.8",
+      "name": "前端 WebView 集成 + Part7 联测",
+      "part": 7,
+      "status": "pending",
+      "test": "网页登录走通；test_backend.sh webview 段全绿",
+      "testedAt": "",
+      "note": ""
     }
   ],
   "testLog": [
@@ -397,6 +492,12 @@
       "task": "T6.1~T6.3 (Part 6)",
       "result": "pass",
       "detail": "Part 6 本地书籍/封面图片/备份导入完成：P5 忠于原版核对（SearchModel 恢复 getSearchScope 语义、SearchScope 迁移、HttpLogController 补回 setRecording）；--local-smoke-test 全过（T6.1 TXT/EPUB 导入→目录→正文全链路 + vendored me.ag2s.epublib/umdlib + lib.mobi 等价迁移，AndroidZipFile RandomAccessFile 重写，PdfFile stub 标注；T6.2 getCover/getImg 返回字节 + ImageUtils 解密接入 saveImage + BookCover 纯逻辑 + coverRule.json 资源；T6.3 Backup 导出 + Restore 导入 config.xml 兼容 + AES + Legado fixture 导入）；MCP 明确不移植，已从 PLAN/README/API/ARCHITECTURE/HANDOVER/STATUS 全部删除；test_backend.sh 集成 4.11 段"
+    },
+    {
+      "at": "2026-08-11T21:30:00+08:00",
+      "task": "T7.0~T7.5 (Part 7 引擎层)",
+      "result": "pass",
+      "detail": "Part 7 引擎层 WebView 兼容纯代码完成：T7.0 调研发现原规划 KCEF 已归档废弃（2025-10-28，维护者明示不推荐）+ compose-webview 依赖 Compose UI 与已归档 KCEF → 用户拍板 JCEF 直连 + backend 直接引入 + 真实浏览器验证后置；T7.1 WebViewRequestConfig/PooledWebView 逐字 + DesktopWebView 抽象（JCEF 接缝）；T7.2 WebViewPool 逻辑逐字（acquire/startCleanupTimer diff IDENTICAL）+ DesktopWebViewFactory/resetForTest 接缝；T7.3 WebJsExtensions request 分发逐字（diff IDENTICAL）+ 桌面 RssJsExtensions 基类 + JS_INJECTION 逐字；T7.4 BackstageWebView 编排（getStrResponse/handleResult/buildStrResponse/正则拦截 逐字，仅 runOnUI→DesktopHandler、WebViewClient→回调、webkit Cookie→CookieStore）；T7.5 解除 AnalyzeRule/AnalyzeUrl/JsExtensions 三个裁剪点；--webview-smoke-test 11 项断言 [PASS] + JCEF 真实浏览器段 [SKIP] 后置；教训28：禁用 emoji（Windows GBK 控制台乱码 + grep 断言失效），7 个冒烟测试 + test_backend.sh 全部改 ASCII [PASS]/[FAIL]/[SKIP]"
     }
   ]
 }

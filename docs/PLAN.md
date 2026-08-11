@@ -126,24 +126,24 @@ Part 0 基础与构建（✅ DONE）
 | T6.2 | 封面/图片接口（ImageUtils 解密 + BookCover 恢复） | cover/image 返回字节 |
 | T6.3 | 备份/导入兼容（storage/Backup 等已暂删，重新迁移） | 导入 Legado 备份 JSON |
 
-## 7.5 Part 7 WebView 兼容 + Compose Multiplatform 前端（规划中）
+## 7.5 Part 7 WebView 兼容 + Compose Multiplatform 前端
 
 > 详细方案（调研结论/方案对比/任务分解/风险）：**`docs/WEBVIEW-COMPOSE-PLAN.md`**
-> 状态：2026-08-10 调研完成，待确认决策点（WebView 库选型 / 前端范围 / 实施顺序）
+> 状态：**2026-08-11 引擎层 T7.1~T7.5 完成**；T7.0 选型已改为 **JCEF 直连**（原 KCEF 2025-10-28 归档废弃，见 HANDOVER 13.1），真实浏览器验证后置
 
-| Task | 内容 | 验收 |
-|---|---|---|
-| T7.0 | WebView 库兼容矩阵验证（KCEF vs Wry；Compose 版本） | offscreen 最小加载 + executeJavaScript 取回结果 |
-| T7.1 | WebViewRequestConfig + PooledWebView 等价迁移 | diff ≈ 0 |
-| T7.2 | WebViewPool 桌面版（KCEF browser 复用池） | 池容量/复用/超时清理冒烟 |
-| T7.3 | WebCacheManager + WebJsExtensions JS 桥（request 分发逐字保留） | JS 桥往返成功 |
-| T7.4 | BackstageWebView 桌面版（无头加载 + sourceRegex/overrideUrlRegex/delayTime/timeout） | --webview-smoke-test |
-| T7.5 | 解除调用点裁剪（AnalyzeRule webJs / AnalyzeUrl useWebView / JsExtensions.webView*） | 原书源跑通 |
-| T7.6 | Compose MP 工程骨架（composeApp KMP + desktopMain） | run 出窗口 + 调通 backend API |
-| T7.7 | Compose 前端（书架/书源/阅读，走 API.md） | 端到端阅读闭环 |
-| T7.8 | 前端 WebView 集成 + Part 7 联测 | 网页登录走通；test_backend.sh 全绿 |
+| Task | 内容 | 验收 | 状态 |
+|---|---|---|---|
+| T7.0 | JCEF 直连落地：backend 引入 JCEF 依赖（jcefmaven 坐标核实）+ DesktopWebViewFactory.creator 接 JCEF 实现 | offscreen 最小加载 + executeJavaScript 取回结果（真实浏览器，需下载 bundle） | ⬜ 待做 |
+| T7.1 | WebViewRequestConfig + PooledWebView 等价迁移 + DesktopWebView 抽象 | diff ≈ 0 | ✅ done |
+| T7.2 | WebViewPool 桌面版（浏览器复用池 + 清理协程） | 池容量/复用/超时清理冒烟 | ✅ done |
+| T7.3 | WebCacheManager（已随 CacheManager 迁）+ WebJsExtensions JS 桥（request 分发逐字保留） | JS 里 request 往返成功（Fake 段已验，真实段待 T7.0） | ✅ done |
+| T7.4 | BackstageWebView 桌面版（无头加载 + sourceRegex + overrideUrlRegex + delayTime + timeout + cacheFirst） | 编排逻辑 Fake 冒烟 4 项已过；真实浏览器段待 T7.0 | ✅ done |
+| T7.5 | 解除调用点裁剪（AnalyzeRule webJs / AnalyzeUrl useWebView / JsExtensions.webView*） | 原书源跑通（待 JCEF 接入后真实验证） | ✅ done |
+| T7.6 | Compose MP 工程骨架（composeApp KMP + desktopMain） | run 出窗口 + 调通 backend API | ⬜ 待做 |
+| T7.7 | Compose 前端（书架/书源/阅读，走 API.md） | 端到端阅读闭环 | ⬜ 待做 |
+| T7.8 | 前端 WebView 集成 + Part 7 联测 | 网页登录走通；test_backend.sh 全绿 | ⬜ 待做 |
 
-**约束重申**：只启用 Desktop (JVM) target（依赖全部 JVM 专属，iOS/Web 不可行）；backend 引擎保持纯 JVM 无 Compose 依赖；WebView 功能忠于原版逐组件等价迁移。
+**约束重申**：只启用 Desktop (JVM) target（依赖全部 JVM 专属，iOS/Web 不可行）；backend 引擎保持无 Compose 依赖（JCEF 原生库直入 backend，用户已拍板）；WebView 功能忠于原版逐组件等价迁移；冒烟输出禁用 emoji（ASCII [PASS]/[FAIL]/[SKIP]，教训28）。
 
 ## 8. 跨平台检查清单（每个 Task 验收必查）
 

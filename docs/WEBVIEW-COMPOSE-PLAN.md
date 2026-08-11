@@ -1,7 +1,7 @@
 # WebView 兼容功能 + Compose Multiplatform 前端 规划
 
-> 状态：**调研完成，待确认决策点后实施**（2026-08-10）
-> 关联：PLAN.md（Part 7 新增）、ARCHITECTURE.md（前端解耦原则需修订）、STATUS.json
+> 状态：**2026-08-11 引擎层 T7.1~T7.5 完成**；T7.0 选型已改 JCEF 直连（原 KCEF 归档废弃），真实浏览器验证后置
+> 关联：PLAN.md（Part 7）、ARCHITECTURE.md（前端解耦原则）、STATUS.json
 > 原则不变：忠于原版业务逻辑（Android→桌面等价替换）；跨平台（Windows/macOS/Linux）
 
 ---
@@ -100,11 +100,14 @@ legado-desktop/
 | 引擎与前端模块依赖冲突 | `backend` 保持纯 JVM（不引入 Compose）；WebView 依赖只进 `composeApp`/专用模块；无头执行若需 KCEF 则放独立模块隔离 |
 | iOS/Web target 不可行（依赖 JVM） | 计划明确只启用 Desktop(JVM)；KMP 结构预留，未来引擎替换后再扩 |
 
-## 7. 已确认决策（2026-08-10 用户拍板）
+## 7. 已确认决策（2026-08-10 用户拍板，2026-08-11 修订）
 
-1. **WebView 库选型**：**KCEF**（compose-webview-multiplatform）优先，能力对齐 Android WebView
+1. ~~WebView 库选型：KCEF（compose-webview-multiplatform）优先~~ → **2026-08-11 修订：JCEF 直连**。
+   KCEF（DatL4g）已于 2025-10-28 归档、维护者明示不推荐；compose-webview-multiplatform 是 Compose UI
+   组件（需 composable 渲染，与"引擎层不依赖 Compose UI"冲突）且其桌面底层正是已归档 KCEF。
+   引擎层改 **JCEF 直连 + backend 直接引入**（T7.0 需下载 jcef bundle ~100-200MB 并做 offscreen 真实验证）。
 2. **前端范围**：**最小可用**（书架/书源/阅读核心闭环），后续逐步完善
-3. **实施顺序**：**分两步走** —— 先引擎层（T7.1~T7.5，无头 WebView 兼容，不依赖 Compose UI），再做前端（T7.6~T7.8）
+3. **实施顺序**：**分两步走** —— 先引擎层（T7.1~T7.5，已完成），再做前端（T7.6~T7.8）
 4. **Compose 版本**：**稳定版**（1.11.x，不用 beta）
 5. **网页登录**（登录 UI v2 之外的原版 WebView 登录）：**最小可用阶段不包含**。过渡方案（已确认）：
    - 引擎/前端提供 API：返回书源登录 URL

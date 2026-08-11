@@ -16,6 +16,7 @@ import io.legado.desktop.help.CacheManager
 import io.legado.desktop.help.ConcurrentRateLimiter
 import io.legado.desktop.help.JsExtensions
 import io.legado.desktop.help.config.AppConfig
+import io.legado.desktop.help.http.BackstageWebView
 import io.legado.desktop.help.http.CookieManager
 import io.legado.desktop.help.http.CookieManager.mergeCookies
 import io.legado.desktop.help.http.CookieStore
@@ -450,7 +451,7 @@ class AnalyzeUrl(
         val startTime = System.currentTimeMillis()
         val strResponse: StrResponse
         try {
-            if (false) { // 桌面版不支持 WebView 请求（原 this.useWebView && useWebView）
+            if (this.useWebView && useWebView) {
                 strResponse = when (method) {
                     RequestMethod.POST -> {
                         val res = getClient().newCallStrResponse(retry) {
@@ -465,14 +466,26 @@ class AnalyzeUrl(
                         if (shouldReturnRedirectBeforeWebView(followRedirects, res.raw.code)) {
                             res
                         } else {
-                            res
+                            BackstageWebView(
+                                url = res.url,
+                                html = res.body,
+                                tag = source?.getKey(),
+                                javaScript = webJs ?: jsStr,
+                                sourceRegex = sourceRegex,
+                                headerMap = headerMap,
+                                delayTime = webViewDelayTime
+                            ).getStrResponse()
                         }
                     }
 
-                    else -> getClient().newCallStrResponse(retry) {
-                        addHeaders(headerMap)
-                        url(urlNoQuery)
-                    }
+                    else -> BackstageWebView(
+                        url = url,
+                        tag = source?.getKey(),
+                        javaScript = webJs ?: jsStr,
+                        sourceRegex = sourceRegex,
+                        headerMap = headerMap,
+                        delayTime = webViewDelayTime
+                    ).getStrResponse()
                 }
             } else {
                 strResponse = getClient().newCallStrResponse(retry) {

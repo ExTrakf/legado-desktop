@@ -15,6 +15,7 @@ import io.legado.desktop.data.entities.RssArticle
 import io.legado.desktop.exception.NoStackTraceException
 import io.legado.desktop.help.CacheManager
 import io.legado.desktop.help.JsExtensions
+import io.legado.desktop.help.http.BackstageWebView
 import io.legado.desktop.help.http.CookieStore
 import io.legado.desktop.help.source.getShareScope
 import io.legado.desktop.help.source.getSharedGlobalStateKey
@@ -173,8 +174,22 @@ class AnalyzeRule(
      * 获取webJs结果
      */
     private fun getWebJsResult(jsStr: String, result: Any): String {
-        // 桌面版不支持 WebView 执行 JS（原 BackstageWebView），相关书源将在此处报错
-        throw NoStackTraceException("桌面版不支持 WebView 执行 JS（webJs）")
+        if (isMainThread) {
+            error("webJs must be called on a background thread")
+        }
+        return runBlocking {
+            BackstageWebView(
+                url = baseUrl,
+                html = content.toString(),
+                javaScript = jsStr,
+                headerMap = getSource()?.getHeaderMap(true),
+                tag = getSource()?.getKey(),
+                cacheFirst = true,
+                timeout = 10000,
+                result = GSON.toJson(result),
+                isRule = true
+            ).getStrResponse().body.toString()
+        }
     }
 
     /**

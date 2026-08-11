@@ -92,6 +92,15 @@ fun main(args: Array<String>) {
         exitProcess(if (fails == 0) 0 else 1)
     }
 
+    // 1.12 Part7 WebView 引擎层冒烟模式（T7.1 请求配置 + T7.3 JS 桥分发 + T7.2 池 + T7.4 编排，Fake 驱动）：
+    // 纯逻辑验证，不依赖真实浏览器；JCEF 接入（T7.0 验证步骤）后追加真实浏览器断言
+    if (args.contains("--webview-smoke-test")) {
+        println("== Part7 webview smoke test ==")
+        val fails = WebViewSmokeTest.run()
+        println("== Part7 webview smoke test result: ${if (fails == 0) "PASS" else "FAIL($fails)"} ==")
+        exitProcess(if (fails == 0) 0 else 1)
+    }
+
     // 2+3. HTTP/WS 服务
     val server = HttpServer(port)
     val wsServer = WebSocketServer(port + 1)

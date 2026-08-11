@@ -13,6 +13,7 @@ import io.legado.desktop.constant.AppPattern
 import io.legado.desktop.data.entities.BaseSource
 import io.legado.desktop.exception.NoStackTraceException
 import io.legado.desktop.help.config.AppConfig
+import io.legado.desktop.help.http.BackstageWebView
 import io.legado.desktop.help.http.CookieManager.cookieJarHeader
 import io.legado.desktop.help.http.CookieStore
 import io.legado.desktop.help.http.SSLHelper
@@ -226,15 +227,25 @@ interface JsExtensions : JsEncodeUtils {
      * @param cacheFirst 优先使用缓存,为true能提高访问速度
      * @return 返回js获取的内容
      */
-    fun webView(html: String?, url: String?, js: String?, cacheFirst: Boolean): String?  {
-        // 桌面版不支持 WebView 执行 JS（原 BackstageWebView）
-        throw NoStackTraceException("桌面版不支持 WebView 功能：webView")
+    fun webView(html: String?, url: String?, js: String?, cacheFirst: Boolean): String? {
+        if (isMainThread) {
+            error("webView must be called on a background thread")
+        }
+        return runBlocking(context) {
+            BackstageWebView(
+                url = url,
+                html = html,
+                javaScript = js,
+                headerMap = getSource()?.getHeaderMap(true),
+                tag = getSource()?.getKey(),
+                cacheFirst = cacheFirst
+            ).getStrResponse().body
+        }
     }
 
 
     fun webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String): String? {
-// 桌面版不支持 WebView 执行 JS（原 BackstageWebView）
-        throw NoStackTraceException("桌面版不支持 WebView 功能")
+        return webViewGetSource(html, url, js, sourceRegex, false, 0)
     }
 
 
@@ -253,14 +264,26 @@ interface JsExtensions : JsEncodeUtils {
         cacheFirst: Boolean,
         delayTime:Long
     ): String?  {
-        // 桌面版不支持 WebView 执行 JS（原 BackstageWebView）
-        throw NoStackTraceException("桌面版不支持 WebView 功能：webViewGetSource")
+        if (isMainThread) {
+            error("webViewGetSource must be called on a background thread")
+        }
+        return runBlocking(context) {
+            BackstageWebView(
+                url = url,
+                html = html,
+                javaScript = js,
+                headerMap = getSource()?.getHeaderMap(true),
+                tag = getSource()?.getKey(),
+                sourceRegex = sourceRegex,
+                cacheFirst = cacheFirst,
+                delayTime = delayTime
+            ).getStrResponse().body
+        }
     }
 
 
     fun webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String): String? {
-// 桌面版不支持 WebView 执行 JS（原 BackstageWebView）
-        throw NoStackTraceException("桌面版不支持 WebView 功能")
+        return webViewGetOverrideUrl(html, url, js, overrideUrlRegex, false, 0)
     }
 
 
@@ -279,8 +302,21 @@ interface JsExtensions : JsEncodeUtils {
         cacheFirst: Boolean,
         delayTime:Long
     ): String?  {
-        // 桌面版不支持 WebView 执行 JS（原 BackstageWebView）
-        throw NoStackTraceException("桌面版不支持 WebView 功能：webViewGetOverrideUrl")
+        if (isMainThread) {
+            error("webViewGetOverrideUrl must be called on a background thread")
+        }
+        return runBlocking(context) {
+            BackstageWebView(
+                url = url,
+                html = html,
+                javaScript = js,
+                headerMap = getSource()?.getHeaderMap(true),
+                tag = getSource()?.getKey(),
+                overrideUrlRegex = overrideUrlRegex,
+                cacheFirst = cacheFirst,
+                delayTime = delayTime
+            ).getStrResponse().body
+        }
     }
 
 

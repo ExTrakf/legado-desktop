@@ -400,3 +400,42 @@
 - Part 0/1/2/3/4/5/**6** ✅（--local-smoke-test 全过 + dao/net/rule/source/api 全 PASS），STATUS.json 已同步（lessons 追加 22~27；MCP 已删除）
 - remote main 最新：本会话提交后更新
 - 下一步：**Part 7 WebView 兼容 + Compose Multiplatform 前端**（T7.1 引擎层无头 WebView → T7.5 解除调用点裁剪 → T7.6~T7.8 Compose 前端），详见 PLAN.md 第 7.5 节与 docs/WEBVIEW-COMPOSE-PLAN.md
+
+## 13. Part 7 引擎层 WebView 兼容会话经验（2026-08-11，交接给下一会话）
+
+> 本会话从「读原版 WebView 组件 → T7.0 选型调研（发现 KCEF 已废弃）→ 用户拍板 JCEF 直连 → 迁移 T7.1~T7.5 → --webview-smoke-test → 全仓 emoji 清理」全程完成。
+> **结论：引擎层纯代码（T7.1~T7.5）已交付并编译通过；JCEF 真实浏览器接入与 offscreen 验证（T7.0）后置，未执行。**
+
+### 13.1 本轮完成
+- **T7.0 选型变更（重要，推翻规划原案）**：
+  - 规划选定的 **KCEF（DatL4g）已于 2025-10-28 归档**，README 明示 "not recommended / highly outdated"（最后版本 2023.10.11.1）
+  - compose-webview-multiplatform 是 Compose UI 组件（需 composable 渲染），且其桌面端底层正是已归档 KCEF
+  - **用户拍板：JCEF 直连 + backend 直接引入 + 真实浏览器验证后置到实施阶段**
+- **T7.1** `help/webView/WebViewRequestConfig.kt`（diff 逐字 IDENTICAL）+ `PooledWebView.kt`（去 Android upContext）+ `DesktopWebView.kt`（**新增抽象 = JCEF 接缝**：settings/事件回调 onConsoleMessage·onPageFinished·onBeforeBrowse(url,isRedirect)·onResourceLoad/loadUrl·loadHtml/evaluateJavascript(结果回调)/loadJavaScriptUrl/addJavascriptInterface/destroy）
+- **T7.2** `WebViewPool.kt`：逻辑逐字（acquire/startCleanupTimer diff IDENTICAL，CACHED=max(threadCount/10,5)、IDLE 5min/LAST 30min、30s 清理协程）；只裁 Android View 操作 + Dispatchers.Main→Default；新增 `DesktopWebViewFactory`（creator 接缝）+ `resetForTest()`（测试接缝）
+- **T7.3** `WebJsExtensions.kt`：request funName 分发 + JS_INJECTION/JS_INJECTION2/basicJs + nameXxx/uuid **全部逐字（diff IDENTICAL）**；`RssJsExtensions.kt` 桌面基类（UI 裁剪，analyzeRule 仅绑定 source）；往返通道 = `DesktopWebView.evaluateJavascript("window.$JSBridgeResult(...)")` + CacheManager
+- **T7.4** `help/http/BackstageWebView.kt`：getStrResponse(超时+取消)/load/isRule 注入/EvalJsRunnable retry/handleResult/buildStrResponse(redirect priorResponse)/SnifferWebClient 正则拦截 **逐字保留**（section diff 仅 runOnUI→mHandler、WebViewClient 覆写→回调、SSL proceed 由 JCEF 内置、javascript:URL→loadJavaScriptUrl）；Handler→`DesktopHandler`（单线程调度器，post/postDelayed/removeCallbacks/shutdown 语义等价）
+- **T7.5** 解除裁剪：AnalyzeRule.getWebJsResult / AnalyzeUrl.executeStrRequest（`if(false)`→`if(this.useWebView && useWebView)`）/ JsExtensions.webView·webViewGetSource·webViewGetOverrideUrl 全部恢复原版
+- **`--webview-smoke-test`**：WebViewSmokeTest + Fake DesktopWebView 驱动，**11 项断言 [PASS]**（T7.1 配置 2 / T7.3 桥 4 / T7.4 编排 4 / T7.2 池 1）+ JCEF 真实浏览器段 [SKIP] 后置；test_backend.sh 集成 4.12 段
+- **全仓 emoji 清理**：7 个冒烟测试 + test_backend.sh 的 ✅/❌/⚠️ 全部改 ASCII `[PASS]/[FAIL]/[SKIP]`（教训28）
+
+### 13.2 本轮新踩的坑（别重踩）
+1. **KCEF 已废弃（T7.0 最致命决策点）**：动手前必须核实库的维护状态。规划文档写于 2026-08-10 选 KCEF，实际 DatL4g/KCEF 2025-10-28 已归档、README 明示不推荐、compose-webview 依赖它且需要 Compose UI 跑起来。**已按用户拍板改 JCEF 直连 + backend 直接引入**。教训29。
+2. **runBlocking 单线程事件循环被 busy-wait 阻塞**：`runBlocking { async { suspendCall() } ; while(不挂起){poll} }` 死锁——runBlocking 用当前线程事件循环，`async` 调度的协程要等主协程挂起才会执行，而 `Thread.sleep` 型 busy-wait 不挂起，**协程永不启动**。修复：`CoroutineScope(Dispatchers.Default).async { ... }` 让挂起调用跑独立线程池。教训30。
+3. **internal 类型跨包引用必须 import**：`WebViewRequestConfig` 是 internal（help.webView），BackstageWebView（help.http）直接引用类型时要显式 `import ...WebViewRequestConfig`，否则 Unresolved。`toWebViewRequestConfig` 扩展函数同理已 import。教训31。
+4. **lambda 赋属性时 `return@属性名` 标签非法**：`onPageFinished = { url -> if (...) return@onPageFinished }` 编译报 "Unresolved label"——属性名不是 lambda 标签。改成 `if (url == BLANK_HTML) { ... }` 结构（语义等价）。教训32。
+5. **Windows 控制台 GBK 把 UTF-8 emoji 打乱**：`& exe` 捕获输出 + GBK 控制台 → ✅/❌ 全变 `?`，`grep -c '✅'` 断言计数失效。**规则：代码/脚本/文档一律 ASCII 标记，禁止 emoji**；本仓 7 个冒烟测试已全部迁移 [PASS]/[FAIL]/[SKIP]。教训28。
+6. **evaluateJavascript 结果回调桌面是 String?**：Android ValueCallback 给非空 String，桌面接口给 `String?`；BackstageWebView 的 `handleResult(it ?: "null")` 保证空值进 retry 分支（语义等价）。教训33。
+
+### 13.3 已验证有效的方法（照用）
+- **忠于原版 diff 三件套**（写完后必跑，本会话已用）：
+  1. `WebViewRequestConfig` / `WebJsExtensions.request()` 分发 / companion JS 注入串：strip package+import 后 **逐字 diff IDENTICAL**
+  2. BackstageWebView section diff：getStrResponse/handleResult+buildStrResponse/companion+Callback **IDENTICAL**；SnifferWebClient 仅 WebViewClient 覆写签名→回调（正文逐字）
+  3. WebViewPool acquire/startCleanupTimer **IDENTICAL**；仅 head 处 Dispatchers.Main→Default
+- **Fake DesktopWebView 驱动纯逻辑冒烟**：确定性验证迁移逻辑（不依赖真实浏览器），JCEF 段 [SKIP] 后置——这是"不编造真实浏览器结果"的诚实做法。`DesktopWebViewFactory.creator` 注入 fake/未来 JCEF 实现。
+- **Windows 冒烟输出核对**：`cmd /c "...bat --webview-smoke-test > file 2>&1"` 原生重定向 + `[IO.File]::ReadAllText(file, UTF8)` 读回，绕开 PowerShell `&` 的 GBK 解码。断言数用 `[regex]::Matches(raw, '\[PASS\]').Count`。
+
+### 13.4 当前状态（2026-08-11 会话结束时）
+- Part 0/1/2/3/4/5/6 done + **Part 7 引擎层 T7.1~T7.5 done**（--webview-smoke-test 11 [PASS] + compileKotlin 0 错误），STATUS.json 已同步（lessons 追加 28~33；notDoing 更新为仅登录 UI 渲染/可见 WebView/webkit Cookie 不移植）
+- remote main 最新：本会话提交后更新
+- 下一步：**T7.0 JCEF 落地**（backend 引入 JCEF 依赖 → 核实 jcefmaven 坐标 → DesktopWebViewFactory.creator 接 JCEF 实现 → offscreen 最小加载/executeJavaScript/JS 桥真实验证 → 追加 --webview-smoke-test 真实段），详见 STATUS.json blockedBy 与 PLAN.md 第 7.5 节

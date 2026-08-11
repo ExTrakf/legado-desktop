@@ -11,8 +11,8 @@ BASE="http://127.0.0.1:$PORT"
 RUN_LOG=/tmp/legado_run_test.log
 PASS=0; FAIL=0
 
-ok()   { PASS=$((PASS+1)); echo "  ✅ $1"; }
-bad()  { FAIL=$((FAIL+1)); echo "  ❌ $1"; }
+ok()   { PASS=$((PASS+1)); echo "  [PASS] $1"; }
+bad()  { FAIL=$((FAIL+1)); echo "  [FAIL] $1"; }
 
 # ---------- 0. 清理残留 ----------
 echo "== 0. 清理残留进程 =="
@@ -43,7 +43,7 @@ for i in $(seq 1 12); do
   fi
 done
 if [ $READY -eq 0 ]; then
-  echo "  ❌ 服务未就绪，日志尾部："
+  echo "  [FAIL] 服务未就绪，日志尾部："
   tail -20 "$RUN_LOG"
   kill "$SERVER_PID" 2>/dev/null
   exit 1
@@ -79,9 +79,9 @@ python3 << 'PYEOF'
 import sqlite3, sys
 ok_fail = [0, 0]
 def ok(m):
-    ok_fail[0] += 1; print(f"  ✅ {m}")
+    ok_fail[0] += 1; print(f"  [PASS] {m}")
 def bad(m):
-    ok_fail[1] += 1; print(f"  ❌ {m}")
+    ok_fail[1] += 1; print(f"  [FAIL] {m}")
 
 conn = sqlite3.connect("/tmp/legado-test/books.db")
 tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
@@ -141,24 +141,24 @@ echo "== 4.5 DAO 冒烟（24 DAO CRUD + flow + collate localized + IN(:list)） 
 LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --dao-smoke-test > /tmp/legado_dao_smoke.log 2>&1
 DAO_EXIT=$?
 if [ $DAO_EXIT -eq 0 ]; then
-  ok "DAO 冒烟全部通过（$(grep -c '✅' /tmp/legado_dao_smoke.log) 项断言）"
+  ok "DAO 冒烟全部通过（$(grep -c '\[PASS\]' /tmp/legado_dao_smoke.log) 项断言）"
 else
   bad "DAO 冒烟失败（exit=$DAO_EXIT）"
-  grep "❌" /tmp/legado_dao_smoke.log | head -10
+  grep "\[FAIL\]" /tmp/legado_dao_smoke.log | head -10
 fi
 
 # ---------- 4.7 Part2 配置/网络冒烟（T2.1 配置 + T2.2 HTTP + T2.3 Cookie + T2.4 代理） ----------
 echo "== 4.7 Part2 配置/网络冒烟（--net-smoke-test） =="
 # 预生成 brotli 压缩字节（node 内置 zlib.brotliCompressSync）
 mkdir -p /tmp/legado-net-test
-node -e "const z=require('zlib');const fs=require('fs');fs.writeFileSync('/tmp/legado-net-test/hello.txt.br', z.brotliCompressSync(Buffer.from('hello brotli world 你好世界')));" 2>/dev/null && echo "  brotli 测试字节已生成" || echo "  ⚠️ node 不可用，brotli 本地测试将跳过（真实 example.com br 仍会测）"
+node -e "const z=require('zlib');const fs=require('fs');fs.writeFileSync('/tmp/legado-net-test/hello.txt.br', z.brotliCompressSync(Buffer.from('hello brotli world 你好世界')));" 2>/dev/null && echo "  brotli 测试字节已生成" || echo "  [SKIP] node 不可用，brotli 本地测试将跳过（真实 example.com br 仍会测）"
 LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --net-smoke-test > /tmp/legado_net_smoke.log 2>&1
 NET_EXIT=$?
 if [ $NET_EXIT -eq 0 ]; then
-  ok "Part2 冒烟全部通过（$(grep -c '✅' /tmp/legado_net_smoke.log) 项断言）"
+  ok "Part2 冒烟全部通过（$(grep -c '\[PASS\]' /tmp/legado_net_smoke.log) 项断言）"
 else
   bad "Part2 冒烟失败（exit=$NET_EXIT）"
-  grep "❌" /tmp/legado_net_smoke.log | head -10
+  grep "\[FAIL\]" /tmp/legado_net_smoke.log | head -10
 fi
 
 # ---------- 4.8 Part3 规则引擎冒烟（T3.1 AnalyzeRule + T3.2 AnalyzeUrl + T3.3 Rhino + T3.4 联测） ----------
@@ -166,10 +166,10 @@ echo "== 4.8 Part3 规则引擎冒烟（--rule-smoke-test） =="
 LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --rule-smoke-test > /tmp/legado_rule_smoke.log 2>&1
 RULE_EXIT=$?
 if [ $RULE_EXIT -eq 0 ]; then
-  ok "Part3 冒烟全部通过（$(grep -c '✅' /tmp/legado_rule_smoke.log) 项断言）"
+  ok "Part3 冒烟全部通过（$(grep -c '\[PASS\]' /tmp/legado_rule_smoke.log) 项断言）"
 else
   bad "Part3 冒烟失败（exit=$RULE_EXIT）"
-  grep "❌" /tmp/legado_rule_smoke.log | head -10
+  grep "\[FAIL\]" /tmp/legado_rule_smoke.log | head -10
 fi
 
 # ---------- 4.9 Part4 书源与读书引擎冒烟（T4.1 SourceHelp/CheckSource + T4.2 jsSource + T4.3 WebBook + T4.4 联测） ----------
@@ -177,10 +177,10 @@ echo "== 4.9 Part4 书源与读书引擎冒烟（--source-smoke-test） =="
 LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --source-smoke-test > /tmp/legado_source_smoke.log 2>&1
 SOURCE_EXIT=$?
 if [ $SOURCE_EXIT -eq 0 ]; then
-  ok "Part4 冒烟全部通过（$(grep -c '✅' /tmp/legado_source_smoke.log) 项断言）"
+  ok "Part4 冒烟全部通过（$(grep -c '\[PASS\]' /tmp/legado_source_smoke.log) 项断言）"
 else
   bad "Part4 冒烟失败（exit=$SOURCE_EXIT）"
-  grep "❌" /tmp/legado_source_smoke.log | head -10
+  grep "\[FAIL\]" /tmp/legado_source_smoke.log | head -10
 fi
 
 # ---------- 4.10 Part5 API 层冒烟（T5.1 路由 + T5.2 书源/RSS/替换 API + T5.3 书籍 API + T5.4 WebSocket + T5.5 端到端） ----------
@@ -188,10 +188,10 @@ echo "== 4.10 Part5 API 层冒烟（--api-smoke-test，独立端口 2433/2434 �
 LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --api-smoke-test --port 2433 > /tmp/legado_api_smoke.log 2>&1
 API_EXIT=$?
 if [ $API_EXIT -eq 0 ]; then
-  ok "Part5 冒烟全部通过（$(grep -c '✅' /tmp/legado_api_smoke.log) 项断言）"
+  ok "Part5 冒烟全部通过（$(grep -c '\[PASS\]' /tmp/legado_api_smoke.log) 项断言）"
 else
   bad "Part5 冒烟失败（exit=$API_EXIT）"
-  grep "❌" /tmp/legado_api_smoke.log | head -10
+  grep "\[FAIL\]" /tmp/legado_api_smoke.log | head -10
 fi
 
 # ---------- 4.11 Part6 本地书籍/封面图片/备份导入冒烟（T6.1 本地解析 + T6.2 封面图片 + T6.3 备份导入） ----------
@@ -199,10 +199,21 @@ echo "== 4.11 Part6 本地书籍/封面图片/备份导入冒烟（--local-smoke
 LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --local-smoke-test > /tmp/legado_local_smoke.log 2>&1
 LOCAL_EXIT=$?
 if [ $LOCAL_EXIT -eq 0 ]; then
-  ok "Part6 冒烟全部通过（$(grep -c '✅' /tmp/legado_local_smoke.log) 项断言）"
+  ok "Part6 冒烟全部通过（$(grep -c '\[PASS\]' /tmp/legado_local_smoke.log) 项断言）"
 else
   bad "Part6 冒烟失败（exit=$LOCAL_EXIT）"
-  grep "❌" /tmp/legado_local_smoke.log | head -10
+  grep "\[FAIL\]" /tmp/legado_local_smoke.log | head -10
+fi
+
+# ---------- 4.12 Part7 WebView 引擎层冒烟（T7.1 请求配置 + T7.3 JS 桥分发 + T7.2 池 + T7.4 编排，Fake 驱动；JCEF 真实浏览器断言待 T7.0 验证步骤追加） ----------
+echo "== 4.12 Part7 WebView 引擎层冒烟（--webview-smoke-test） =="
+LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --webview-smoke-test > /tmp/legado_webview_smoke.log 2>&1
+WEBVIEW_EXIT=$?
+if [ $WEBVIEW_EXIT -eq 0 ]; then
+  ok "Part7 WebView 引擎层冒烟全部通过（$(grep -c '\[PASS\]' /tmp/legado_webview_smoke.log) 项断言）"
+else
+  bad "Part7 WebView 引擎层冒烟失败（exit=$WEBVIEW_EXIT）"
+  grep "\[FAIL\]" /tmp/legado_webview_smoke.log | head -10
 fi
 
 # ---------- 5. 停止服务 ----------
@@ -219,5 +230,5 @@ echo ""
 echo "========== 测试汇总 =========="
 echo "  PASS: $PASS"
 echo "  FAIL: $FAIL"
-[ $FAIL -eq 0 ] && echo "  ✅ 全部通过" || echo "  ❌ 有失败项"
+[ $FAIL -eq 0 ] && echo "  [PASS] 全部通过" || echo "  [FAIL] 有失败项"
 exit $FAIL

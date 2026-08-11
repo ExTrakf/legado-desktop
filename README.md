@@ -86,7 +86,7 @@ frontend/
 - [x] **书源与读书引擎（Part 4）**：SourceHelp / jsSource / WebBook
 - [x] **API 层（Part 5）**：HttpServer 全路由 + WebSocket 搜索/调试 + 书源/RSS/书籍/替换规则/HTTP 日志 API
 - [x] **本地书籍解析（Part 6）**：TXT/EPUB/MOBI/UMD + 封面/图片 + 备份导入
-- [ ] **WebView 兼容 + Compose Multiplatform 前端（Part 7，规划中）**
+- [ ] **WebView 兼容 + Compose Multiplatform 前端（Part 7）**：引擎层 T7.1~T7.5 完成（JCEF 直连，`--webview-smoke-test` 11 项断言）；T7.0 JCEF 接入与 Compose 前端待做
 
 > 数据层细节：24 张实体表 + `book_sources_part` 视图（schema v99）；DAO 接口与 Legado 一致，
 > SQL 逐条对照原版 Room `@Query`；`--dao-smoke-test` 全量冒烟（24 DAO CRUD + flow +
@@ -110,18 +110,17 @@ frontend/
 > 备份导出→清库→恢复→数据一致、Legado 备份 fixture 导入）；vendored `me.ag2s.epublib/umdlib` +
 > `lib.mobi`（Android 专属面仅 Log/Base64/PFD/SparseArray 等，均等价替换）；也由 `tools/test_backend.sh` 集成。
 
-## Part 7：WebView 兼容 + Compose Multiplatform 前端（规划中）
+## Part 7：WebView 兼容 + Compose Multiplatform 前端（引擎层进行中）
 
 恢复原版被裁剪的 WebView 能力（`BackstageWebView` 后台无头执行 JS、`@webjs:` 规则、
 `AnalyzeUrl.useWebView` 分支、`JsExtensions.webView*`），并用 Compose Multiplatform
 统一管理桌面前端（Windows/macOS/Linux，除 Android 外）。详细方案见
 `docs/WEBVIEW-COMPOSE-PLAN.md`。
 
-**已确认决策（2026-08-10）**：
-- WebView 库：**KCEF**（compose-webview-multiplatform）
-- 前端：**最小可用**（书架/书源/阅读核心闭环），后续完善
-- 顺序：**分两步** —— 先引擎层（T7.1~T7.5 无头 WebView，不依赖 Compose UI），再前端（T7.6~T7.8）
-- Compose：**稳定版 1.11.x**
+**已确认决策（2026-08-11 更新）**：
+- WebView 库：**JCEF 直连**（原规划 KCEF 已于 2025-10-28 归档废弃；compose-webview 依赖 Compose UI）
+- 引擎层（T7.1~T7.5）：已完成，`--webview-smoke-test` 11 项断言通过（Fake 驱动纯逻辑）
+- T7.0 JCEF 接入（依赖下载 + offscreen 验证）与 Compose 前端（T7.6~T7.8）待做
 - 网页登录：最小可用阶段不包含；过渡方案 = API 返回登录 URL → 系统浏览器登录 → 手动填 Cookie 到设置
 
 ## 明确不移植（初版禁用）

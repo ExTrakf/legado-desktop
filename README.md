@@ -9,20 +9,20 @@
 
 ```
 ┌──────────────────────────────────────────────┐
-│  frontend/（你的前端，完全自由）                │
+│  frontend/（你的前端，完全自由）               │
 │  - 可以是任何技术栈：Vue/React/Tauri/Electron  │
 │  - 规划中：composeApp/（Compose Multiplatform │
 │    桌面前端，Windows/macOS/Linux，见 Part 7）  │
 └──────────────┬───────────────────────────────┘
                │ HTTP (REST + JSON) / WebSocket / MCP
 ┌──────────────▼───────────────────────────────┐
-│  backend/（纯 JVM Kotlin 服务，本仓库维护）     │
-│  - 规则引擎（正则/XPath/JSONPath/CSS/JS 书源）  │
+│  backend/（纯 JVM Kotlin 服务，本仓库维护）    │
+│  - 规则引擎（正则/XPath/JSONPath/CSS/JS 书源） │
 │  - Rhino JS 引擎（htmlunit-core-js fork）     │
-│  - OkHttp 网络层 + Cookie/代理                 │
-│  - SQLite 数据层（schema 对齐 Legado v99）     │
-│  - NanoHTTPD HTTP 服务 + WebSocket + MCP      │
-│  - 本地书籍解析（TXT/EPUB/MOBI/UMD）           │
+│  - OkHttp 网络层 + Cookie/代理                │
+│  - SQLite 数据层（schema 对齐 Legado v99）    │
+│  - NanoHTTPD HTTP 服务 + WebSocket + MCP     │
+│  - 本地书籍解析（TXT/EPUB/MOBI/UMD）          │
 └──────────────────────────────────────────────┘
 ```
 

@@ -14,14 +14,14 @@
 │  - 规划中：composeApp/（Compose Multiplatform │
 │    桌面前端，Windows/macOS/Linux，见 Part 7）  │
 └──────────────┬───────────────────────────────┘
-               │ HTTP (REST + JSON) / WebSocket / MCP
+               │ HTTP (REST + JSON) / WebSocket
 ┌──────────────▼───────────────────────────────┐
 │  backend/（纯 JVM Kotlin 服务，本仓库维护）    │
 │  - 规则引擎（正则/XPath/JSONPath/CSS/JS 书源） │
 │  - Rhino JS 引擎（htmlunit-core-js fork）     │
 │  - OkHttp 网络层 + Cookie/代理                │
 │  - SQLite 数据层（schema 对齐 Legado v99）    │
-│  - NanoHTTPD HTTP 服务 + WebSocket + MCP     │
+│  - NanoHTTPD HTTP 服务 + WebSocket            │
 │  - 本地书籍解析（TXT/EPUB/MOBI/UMD）          │
 └──────────────────────────────────────────────┘
 ```
@@ -85,7 +85,7 @@ frontend/
 - [x] **规则引擎（Part 3）**：AnalyzeRule（CSS/XPath/JSONPath/Regex/JS 复合规则）+ AnalyzeUrl（key/page/{{js}}/@js/POST）+ Rhino（jsSource mainJs/java 绑定/CryptoJS）
 - [x] **书源与读书引擎（Part 4）**：SourceHelp / jsSource / WebBook
 - [x] **API 层（Part 5）**：HttpServer 全路由 + WebSocket 搜索/调试 + 书源/RSS/书籍/替换规则/HTTP 日志 API
-- [ ] 本地书籍解析（TXT/EPUB/MOBI/UMD）+ 封面/图片 + MCP + 备份导入（Part 6）
+- [x] **本地书籍解析（Part 6）**：TXT/EPUB/MOBI/UMD + 封面/图片 + 备份导入
 - [ ] **WebView 兼容 + Compose Multiplatform 前端（Part 7，规划中）**
 
 > 数据层细节：24 张实体表 + `book_sources_part` 视图（schema v99）；DAO 接口与 Legado 一致，
@@ -105,6 +105,10 @@ frontend/
 > API 层细节：`--api-smoke-test` 冒烟（29 项断言：HttpServer 全路由 + CORS 预检 + 令牌保护 + 404、
 > 书源/RSS/替换规则/HTTP 日志/阅读配置 API、书籍 API 书架/目录/正文/进度、WebSocket searchBook +
 > bookSourceDebug + rssSourceDebug 结果流、导入源→搜索→加书架→目录→正文→进度端到端）；也由 `tools/test_backend.sh` 集成。
+>
+> 本地书籍细节：`--local-smoke-test` 冒烟（TXT/EPUB 导入→目录→正文、封面/正文图片返回字节、
+> 备份导出→清库→恢复→数据一致、Legado 备份 fixture 导入）；vendored `me.ag2s.epublib/umdlib` +
+> `lib.mobi`（Android 专属面仅 Log/Base64/PFD/SparseArray 等，均等价替换）；也由 `tools/test_backend.sh` 集成。
 
 ## Part 7：WebView 兼容 + Compose Multiplatform 前端（规划中）
 

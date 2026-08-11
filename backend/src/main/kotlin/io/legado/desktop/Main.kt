@@ -84,6 +84,14 @@ fun main(args: Array<String>) {
         exitProcess(if (fails == 0) 0 else 1)
     }
 
+    // 1.11 Part6 本地书籍/封面图片/备份导入冒烟模式（T6.1 本地解析 + T6.2 封面图片 + T6.3 备份导入）：跑完即退出
+    if (args.contains("--local-smoke-test")) {
+        println("== Part6 local book smoke test ==")
+        val fails = LocalSmokeTest.run()
+        println("== Part6 local book smoke test result: ${if (fails == 0) "PASS" else "FAIL($fails)"} ==")
+        exitProcess(if (fails == 0) 0 else 1)
+    }
+
     // 2+3. HTTP/WS 服务
     val server = HttpServer(port)
     val wsServer = WebSocketServer(port + 1)

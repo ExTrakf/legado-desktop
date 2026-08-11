@@ -32,7 +32,7 @@ Legado（Android）的完整后端引擎 → 纯 JVM Kotlin 服务，前端完�
 ## 前端解耦原则
 
 1. 后端无任何 UI 代码，无 HTML 模板伺服（静态资源伺服由前端自行处理）。
-2. 所有交互走 `docs/API.md` 契约：REST JSON + WebSocket +（可选）MCP。
+2. 所有交互走 `docs/API.md` 契约：REST JSON + WebSocket。
 3. CORS 放开（后端开发期 `Access-Control-Allow-Origin: *`），前端可用任意域名/端口开发。
 4. 后端监听默认 `127.0.0.1:2323`，端口可用 `--port` 参数/环境变量覆盖。
 

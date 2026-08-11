@@ -4,6 +4,7 @@ import io.legado.desktop.api.ReturnData
 import io.legado.desktop.help.config.AppConfig
 import io.legado.desktop.help.http.HttpLogRecord
 import io.legado.desktop.help.http.HttpLogStore
+import io.legado.desktop.utils.putPrefBoolean
 
 object HttpLogController {
 
@@ -33,6 +34,24 @@ object HttpLogController {
         val record = HttpLogStore.get(id)
             ?: return ReturnData().setErrorMsg("未找到 HTTP 记录 #$id")
         return ReturnData().setData(record)
+    }
+
+    internal fun setRecording(enabled: Boolean): ReturnData {
+        return setRecording(
+            enabled = enabled,
+            persist = { putPrefBoolean(io.legado.desktop.constant.PreferKey.recordHttpLog, it) },
+            updateRuntime = { AppConfig.recordHttpLog = it },
+        )
+    }
+
+    internal fun setRecording(
+        enabled: Boolean,
+        persist: (Boolean) -> Unit,
+        updateRuntime: (Boolean) -> Unit,
+    ): ReturnData {
+        persist(enabled)
+        updateRuntime(enabled)
+        return ReturnData().setData(mapOf("recording" to enabled))
     }
 
     private fun summary(record: HttpLogRecord): Map<String, Any?> = mapOf(

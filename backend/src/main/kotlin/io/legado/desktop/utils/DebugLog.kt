@@ -6,6 +6,14 @@ object DebugLog {
         LogUtils.d("Debug", msg)
     }
 
+    fun d(tag: String, msg: String) {
+        LogUtils.d(tag, msg)
+    }
+
+    fun d(tag: String, msg: String, tr: Throwable) {
+        LogUtils.d(tag, "$msg\n${tr.stackTraceToString()}")
+    }
+
     fun e(tag: String, msg: String) {
         LogUtils.e(tag, msg)
     }

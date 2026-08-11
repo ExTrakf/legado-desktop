@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-11T13:30:00+08:00",
+  "updatedAt": "2026-08-11T20:30:00+08:00",
   "project": "legado-desktop",
   "source": {
     "repo": "https://github.com/LegadoTeam/legado",
@@ -47,15 +47,21 @@
     "教训18：raw socket 做 WebSocket 客户端时，101 握手响应除状态行外还有响应头，必须读到空行才结束——否则剩余头字节会被当帧解析（searchBook 表现为超时、debug 表现为收不到日志但收到\"假 close 帧\"）",
     "教训19：NanoHTTPD 的 OPTIONS 预检仅在请求带 Origin 头时回显 Access-Control-Allow-Origin（addWebHeaders 逻辑），无 Origin 就没有该头——测试要模拟浏览器带 Origin；JDK HttpClient 发 OPTIONS 要显式 .method(\"OPTIONS\", noBody())",
     "教训20：Part5 冒烟必须在全新 LEGADO_DESKTOP_HOME 下运行——saveReplaceRule 即使 isSuccess=false 也已真实落库，上一轮残留的\"萧炎→XY\"替换规则会让下一轮 getBookContent 断言\"萧炎\"失败（ContentProcessor 已替换）；smoke 前必须 rm -rf 数据目录",
-    "教训21：--api-smoke-test 启动的服务器绑定 Main 解析的 --port，与 test_backend.sh 主服务端口冲突——集成脚本里用 --port 2433 独立端口避开"
+    "教训21：--api-smoke-test 启动的服务器绑定 Main 解析的 --port，与 test_backend.sh 主服务端口冲突——集成脚本里用 --port 2433 独立端口避开",
+    "教训22：TXT 目录规则选择启发式以 contentLength>1000 计数章节（start==0 或 >1000 才 csNum++，100~1000 死区），短段落测试数据会导致所有规则被拒（numE 误判为卷）；测试 TXT 正文需 >1000 字符/章",
+    "教训23：文件开头的\"第一章\"（无前导空白）会被 lookbehind 目录规则跳过，整段（书名/作者行）成为\"前言\"章节——这是原版忠实行为，测试断言需允许前言章存在",
+    "教训24：桌面版 PDF 依赖 Android PdfRenderer 无 JVM 等价 → PdfFile 以 stub 抛 NoStackTraceException 标注裁剪；计划明确只做 TXT/EPUB/MOBI/UMD",
+    "教训25：本地书籍依赖 vendored 库（me.ag2s.epublib/umdlib + io.legado.app.lib.mobi）——Android 依赖面仅 Log/Base64/Build/NonNull/PFD/SparseArray/Pools.SynchronizedPool；AndroidZipFile 用 RandomAccessFile 重写（zip 算法逐字保留，含原版 filepos+=len 语义）；mobi 的 PDBFile 用 FileChannel；SparseArray/Pools 做桌面等价类",
+    "教训26：Legado 备份的 config.xml 是 Android SharedPreferences XML（<map><string name=\"k\">v</string>...），桌面用 PrefsXml 读写等价；servers.json 用 hutool AES(Base64) 加密；导出→清库→恢复→断言数据一致是最直接的忠于原版验证",
+    "教训27：DesktopEnv 需提供 allPrefs()/putPrefRaw()（typed 偏好导出/导入）才能做 config.xml 兼容；JS 书源令牌（webDavPassword）在备份中走 AES 加密"
   ],
   "current": {
-    "part": 5,
-    "task": "T5.1~T5.5 全部完成",
+    "part": 6,
+    "task": "T6.1~T6.3 全部完成",
     "taskStatus": "done",
-    "whatImDoing": "Part 5 API 层完成：--api-smoke-test 29 项断言全过（T5.1 HttpServer 路由整合+CORS+令牌校验+404 / T5.2 书源/RSS/替换规则/HTTP日志 API / T5.3 书籍 API 书架/目录/正文/进度/阅读配置 / T5.4 WebSocket searchBook+bookSourceDebug+rssSourceDebug 结果流 / T5.5 导入源→WS搜索→加书架→目录→正文→进度端到端）；HttpLogController 迁移；WebSocket 服务 port+1 与原版一致",
+    "whatImDoing": "Part 6 本地书籍/封面图片/备份导入完成：--local-smoke-test 全过（T6.1 localBook 全量迁移 TXT/EPUB/MOBI/UMD + vendored me.ag2s.epublib/umdlib + lib.mobi + addLocalBook/refreshToc 本地分支 + BookHelp.readContent 本地正文 / T6.2 ImageUtils 解密 + ImageProvider 字节化 + BookCover 纯逻辑 + BookController.getCover/getImg 返回字节 + BookHelp.saveImage 接解密 / T6.3 Backup 导出 + Restore 导入（config.xml 兼容 + AES + fixture 导入））；P5 忠于原版核对并修复 SearchScope 分歧；MCP 明确不移植已从全部文档删除",
     "blockedBy": [],
-    "nextAfterThis": "Part 6 本地书籍/封面/图片/MCP/备份（T6.1 本地书籍解析 → T6.2 封面图片 → T6.3 MCP → T6.4 备份导入，后两项可选）"
+    "nextAfterThis": "Part 7 WebView 兼容 + Compose Multiplatform 前端（T7.1~T7.8，详见 docs/WEBVIEW-COMPOSE-PLAN.md；先引擎层后前端）"
   },
   "parts": [
     {
@@ -90,14 +96,15 @@
     },
     {
       "id": 5,
-      "name": "API 层（HTTP/WS/MCP）",
+      "name": "API 层（HTTP/WS）",
       "status": "done",
-      "note": "T5.1~T5.5 全部验收：--api-smoke-test 29 项断言全过（HttpServer 全路由+CORS+令牌校验+404 / 书源/RSS/替换/HTTP日志/阅读配置 API / 书籍 API 书架/目录/正文/进度 / WebSocket searchBook+双调试结果流 / 端到端闭环）；WebSocket port+1；HttpLogController 迁移；MCP 留待 T6.3"
+      "note": "T5.1~T5.5 全部验收：--api-smoke-test 29 项断言全过（HttpServer 全路由+CORS+令牌校验+404 / 书源/RSS/替换/HTTP日志/阅读配置 API / 书籍 API 书架/目录/正文/进度 / WebSocket searchBook+双调试结果流 / 端到端闭环）；WebSocket port+1；HttpLogController 迁移；P5 忠于原版核对修复 SearchScope 分歧"
     },
     {
       "id": 6,
       "name": "本地书籍与附加功能",
-      "status": "todo"
+      "status": "done",
+      "note": "T6.1~T6.3 全部验收：--local-smoke-test 全过（TXT/EPUB/MOBI/UMD 解析 + vendored epublib/umdlib/mobi / 封面图片字节 + ImageUtils 解密 / 备份导出+导入 config.xml 兼容）；MCP 明确不移植已删除"
     }
   ],
   "tasks": [
@@ -318,33 +325,28 @@
       "id": "T6.1",
       "name": "本地书籍解析",
       "part": 6,
-      "status": "todo",
-      "test": "txt/epub 可读",
-      "testedAt": null
+      "status": "done",
+      "test": "txt/epub 可读（TXT 目录/正文、EPUB 目录/正文、MOBI/UMD 解析器迁移）",
+      "testedAt": "2026-08-11",
+      "note": "localBook 全量迁移 + vendored me.ag2s.epublib/umdlib + io.legado.desktop.lib.mobi（AndroidZipFile RandomAccessFile 重写）；PdfFile stub（Android PdfRenderer 无 JVM 等价）；addLocalBook/refreshToc 本地分支/BookHelp.readContent 本地正文接入"
     },
     {
       "id": "T6.2",
       "name": "封面/图片接口",
       "part": 6,
-      "status": "todo",
-      "test": "cover/image 返回字节",
-      "testedAt": null
+      "status": "done",
+      "test": "cover/image 返回字节（getCover 本地文件/URL、getImg 缓存图片字节）",
+      "testedAt": "2026-08-11",
+      "note": "ImageUtils 解密接入 BookHelp.saveImage；ImageProvider 字节化；BookCover 纯逻辑（规则配置+searchCover）；BitmapUtils ImageIO 等价；coverRule.json 资源补齐"
     },
     {
       "id": "T6.3",
-      "name": "MCP 服务（可选）",
+      "name": "备份/导入兼容",
       "part": 6,
-      "status": "todo",
-      "test": "工具列表可枚举",
-      "testedAt": null
-    },
-    {
-      "id": "T6.4",
-      "name": "备份/导入兼容（可选）",
-      "part": 6,
-      "status": "todo",
-      "test": "导入 Legado 备份",
-      "testedAt": null
+      "status": "done",
+      "test": "导入 Legado 备份（导出→清库→恢复→数据一致；手写 Legado fixture 导入）",
+      "testedAt": "2026-08-11",
+      "note": "Backup 导出 + Restore 导入（config.xml SharedPreferences XML 兼容 + servers AES + fixture 导入）；AppWebDav/视频/主题/调度裁剪"
     }
   ],
   "testLog": [
@@ -389,6 +391,12 @@
       "task": "T5.1~T5.5 (Part 5)",
       "result": "pass",
       "detail": "Part 5 API 层完成：--api-smoke-test 29 项断言全过（T5.1 HttpServer 迁移 web/HttpServer.kt 全路由 + CORS 预检带 Origin 回显 + 令牌保护 + 404 + /api/health；T5.2 书源/RSS/替换规则/HTTP 日志 API 增删改查 + HttpLogController 迁移；T5.3 BookController 迁移书架/加删书/目录 refreshToc/正文+ContentProcessor/进度/阅读配置，cover·image·addLocalBook 占位标注 T6.x；T5.4 WebSocketServer + searchBook/bookSourceDebug/rssSourceDebug 三 socket 迁移，searchBook 收到搜索结果帧、双调试收到步骤日志流并正常关闭；T5.5 导入源→WS 搜索→加书架→目录→正文→进度端到端闭环）；raw socket WS 客户端（消费 101 响应头，教训18）；ReplaceRuleController 不 setData 确认为原版行为不改（教训16）；test_backend.sh 集成 4.10 段（--api-smoke-test --port 2433 避开主服务端口）"
+    },
+    {
+      "at": "2026-08-11T20:30:00+08:00",
+      "task": "T6.1~T6.3 (Part 6)",
+      "result": "pass",
+      "detail": "Part 6 本地书籍/封面图片/备份导入完成：P5 忠于原版核对（SearchModel 恢复 getSearchScope 语义、SearchScope 迁移、HttpLogController 补回 setRecording）；--local-smoke-test 全过（T6.1 TXT/EPUB 导入→目录→正文全链路 + vendored me.ag2s.epublib/umdlib + lib.mobi 等价迁移，AndroidZipFile RandomAccessFile 重写，PdfFile stub 标注；T6.2 getCover/getImg 返回字节 + ImageUtils 解密接入 saveImage + BookCover 纯逻辑 + coverRule.json 资源；T6.3 Backup 导出 + Restore 导入 config.xml 兼容 + AES + Legado fixture 导入）；MCP 明确不移植，已从 PLAN/README/API/ARCHITECTURE/HANDOVER/STATUS 全部删除；test_backend.sh 集成 4.11 段"
     }
   ]
 }

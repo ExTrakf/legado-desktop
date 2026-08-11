@@ -14,6 +14,7 @@ import io.legado.desktop.data.entities.rule.SearchRule
 import io.legado.desktop.data.entities.rule.TocRule
 import io.legado.desktop.help.book.ContentProcessor
 import io.legado.desktop.help.book.SearchBookShelfHelp
+import io.legado.desktop.help.config.AppConfig
 import io.legado.desktop.help.source.SourceHelp
 import io.legado.desktop.model.CheckSource
 import io.legado.desktop.model.CheckSourceRunner
@@ -22,6 +23,7 @@ import io.legado.desktop.model.Debug
 import io.legado.desktop.model.jsSource.JsSourceBook
 import io.legado.desktop.model.jsSource.JsSourceUpsert
 import io.legado.desktop.model.webBook.SearchModel
+import io.legado.desktop.model.webBook.SearchScope
 import io.legado.desktop.model.webBook.WebBook
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -396,6 +398,7 @@ object SourceSmokeTest {
                 val finalBooks = AtomicReference<List<SearchBook>>()
                 val errors = AtomicReference<Throwable?>()
                 val callback = object : SearchModel.CallBack {
+                    override fun getSearchScope(): SearchScope = SearchScope(AppConfig.searchScope)
                     override fun onSearchStart() {}
                     override fun onSearchProgress(searched: Int, total: Int) {}
                     override fun onSearchSuccess(searchBooks: List<SearchBook>) {

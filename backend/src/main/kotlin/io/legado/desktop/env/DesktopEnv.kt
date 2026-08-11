@@ -122,4 +122,46 @@ object DesktopEnv {
 
     /** 全部配置 key（供 SourceConfig 等清理用） */
     fun allPrefKeys(): List<String> = load().keySet().toList()
+
+    /** 全部偏好（typed：Int/Long/Boolean/String/Float/Double），供备份导出用 */
+    fun allPrefs(): Map<String, Any> {
+        val obj = load()
+        val map = HashMap<String, Any>()
+        obj.keySet().forEach { k ->
+            val el = obj.get(k)
+            if (el.isJsonPrimitive) {
+                val p = el.asJsonPrimitive
+                when {
+                    p.isBoolean -> map[k] = p.asBoolean
+                    p.isNumber -> {
+                        val d = p.asDouble
+                        map[k] = if (d == Math.floor(d) && !d.isInfinite()) {
+                            if (d >= Int.MIN_VALUE && d <= Int.MAX_VALUE) p.asInt else p.asLong
+                        } else p.asDouble
+                    }
+                    else -> map[k] = p.asString
+                }
+            }
+        }
+        return map
+    }
+
+    /** 按值类型写入偏好，供备份恢复用 */
+    fun putPrefRaw(key: String, value: Any) {
+        when (value) {
+            is Int -> putPrefInt(key, value)
+            is Long -> putPrefLong(key, value)
+            is Boolean -> putPrefBoolean(key, value)
+            is String -> putPrefString(key, value)
+            is Float -> {
+                load().addProperty(key, value)
+                save()
+            }
+            is Double -> {
+                load().addProperty(key, value)
+                save()
+            }
+            else -> putPrefString(key, value.toString())
+        }
+    }
 }

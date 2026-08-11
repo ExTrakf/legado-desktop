@@ -10,6 +10,7 @@ import io.legado.desktop.help.config.LocalConfig
 import io.legado.desktop.help.config.ReadBookConfig
 import io.legado.desktop.help.coroutine.Coroutine
 import io.legado.desktop.help.source.clearSharedGlobalState
+import io.legado.desktop.model.BookCover
 import io.legado.desktop.utils.GSON
 import io.legado.desktop.utils.fromJsonArray
 import io.legado.desktop.utils.fromJsonObject
@@ -56,6 +57,14 @@ object DefaultData {
         )
         GSON.fromJsonArray<ReadBookConfig.Config>(json).getOrNull()
             ?: emptyList()
+    }
+
+    val coverRule: BookCover.CoverRule by lazy {
+        val json = String(
+            javaClass.getResourceAsStream("/defaultData/coverRule.json")
+                .readBytes()
+        )
+        GSON.fromJsonObject<BookCover.CoverRule>(json).getOrThrow()
     }
 
     val txtTocRules: List<TxtTocRule> by lazy {

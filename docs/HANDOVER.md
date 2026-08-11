@@ -78,8 +78,7 @@
 
 ### E. 已裁剪功能（后续 Part 要恢复的）
 - `model/localBook/*`（T6.1 重新迁移：TXT/EPUB/MOBI/UMD）
-- `help/storage/Backup*`、`ImportOldData`（T6.4）
-- `web/mcp/*`（T6.3）
+- `help/storage/Backup*`、`ImportOldData`（T6.3）
 - `model/BookCover`、`ImageProvider`、`help/ImageUtils`（T6.2，图片解密）
 - `model/login/*` 除 `LoginUiV2`（纯逻辑已迁）
 - `model/remote/*`（WebDAV，可选）
@@ -367,4 +366,37 @@
 ### 11.4 当前状态（2026-08-11 会话结束时）
 - Part 0/1/2/3/4/**5** ✅（--api-smoke-test 29 项断言 + dao/net/rule/source 全 PASS），STATUS.json 已同步（lessons 追加 16~21）
 - remote main 最新：本会话提交后更新
-- 下一步：**Part 6 本地书籍/封面/图片/MCP/备份**（T6.1 本地书籍解析 → T6.2 封面图片 → T6.3 MCP → T6.4 备份导入，后两项可选），详见 PLAN.md 第 7 节；BookController 中 cover/image/addLocalBook 占位与 `readContent` 本地分支待 T6.x 补全
+- 下一步：**Part 6 本地书籍/封面/图片/备份**（T6.1 本地书籍解析 → T6.2 封面图片 → T6.3 备份导入，后两项可选），详见 PLAN.md 第 7 节；BookController 中 cover/image/addLocalBook 占位与 `readContent` 本地分支待 T6.x 补全
+
+## 12. Part 6 本地书籍/封面图片/备份会话经验（2026-08-11，交接给下一会话）
+
+> 本会话从「P5 忠于原版核对 → 删去 MCP → 迁移 vendored 库 + localBook + 封面图片 + 备份导入 → --local-smoke-test → 联测 → 推送」全程完成。
+> 结论：**Part 6 增量迁移约 150 文件（vendored me.ag2s.* + lib.mobi + localBook + storage + image），PdfFile 按计划 stub；MCP 明确不移植已全量删除**。
+
+### 12.1 本轮完成
+- **P5 忠于原版核对**（上一会话产物）：WebSocketServer/socket 与 BookController/HttpLogController/ReturnData/ReaderProviderRoutes 逐字等价；**发现并修复一处真实分歧**——桌面 SearchModel 迁移时丢了 `CallBack.getSearchScope()`（原版按 AppConfig.searchScope 限制搜索范围），已迁移 SearchScope（MutableLiveData → SimpleLiveData stub）+ 接回 SearchModel + WS + SourceSmokeTest 回调；HttpLogController 补回 setRecording（原版仅 MCP 调用）。
+- **删去 MCP**：PLAN.md / README.md / API.md / ARCHITECTURE.md / HANDOVER.md / STATUS.json 全部移除（架构图、依赖图、任务表、T6.3、T6.4→T6.3 重编号）。
+- **T6.1 本地书籍**：vendored `me.ag2s.epublib`(76)+`me.ag2s.umdlib`(9)+`io.legado.desktop.lib.mobi`(34)；localBook 全量迁移（TextFile/EpubFile/MobiFile/UmdFile/BaseLocalBookParse/CloseableCache/LocalBook）；`BookController.addLocalBook`/`refreshToc` 本地分支/`BookHelp.readContent` 本地正文接入；`Book.isLocalModified()`/`getLocalUri` 缓存+书库回退忠实实现。PdfFile stub（Android PdfRenderer 无 JVM 等价）。
+- **T6.2 封面图片**：ImageUtils 解密接入 BookHelp.saveImage；ImageProvider 字节化；BookCover 纯逻辑；BitmapUtils ImageIO 等价；coverRule.json 资源补齐。
+- **T6.3 备份导入**：Backup 导出 + Restore 导入（config.xml SharedPreferences XML 兼容 + servers AES + fixture）；AppWebDav/视频/主题/调度裁剪。
+- `--local-smoke-test`（11 项断言）+ test_backend.sh 4.11 段。
+
+### 12.2 本轮新踩的坑（别重踩）
+1. **TXT 目录规则选择启发式有"死区"**：`getTocRule` 中 `contentLength` 在 100~1000 字符时既不 csNum++ 也不 numE++（被跳过）；短段落（<100 字符）计入 numE 导致规则全拒。**测试 TXT 每章正文必须 >1000 字符**，否则选不出规则（tocUrl 空 → 无规则分章）。教训22。
+2. **文件开头"第一章"被 lookbehind 规则跳过**：默认第一条规则 `(?<=[　\s])...` 要求前导空白，文件开头的"第一章"不匹配 → 被当作"前言"章。这是**原版忠实行为**，测试断言要允许前言章。前加书名/作者行使第一章被匹配。教训23。
+3. **PDF 无 JVM 等价**：Android PdfRenderer 渲染 PDF 页为 Bitmap，桌面 JVM 没有；计划明确只做 TXT/EPUB/MOBI/UMD，PdfFile stub 抛 `NoStackTraceException("桌面版暂不支持 PDF 解析")`（本地导入 PDF 报错，其余格式不受影响）。教训24。
+4. **vendored 库 Android 依赖面**：epublib 用 android.util.Log/Base64、android.os.Build（BOMInputStream 的 SDK 版本判断→`if(true)`）、androidx.annotation.NonNull、ParcelFileDescriptor（AndroidZipFile）；mobi 用 SparseArray/Pools.SynchronizedPool/PFD；umdlib 仅 NonNull。全部等价替换后**编译零 android import**。AndroidZipFile 用 RandomAccessFile 重写（zip 解析算法逐字保留，含原版 `filepos += len` 语义）；mobi PDBFile 用 FileChannel。教训25。
+5. **备份 config.xml 是 Android SharedPreferences XML**：`<map><string name="k">v</string><int>...` 而非 JSON；桌面需 PrefsXml 读写等价。DesktopEnv 需 `allPrefs()`/`putPrefRaw()`（typed 导出/导入）。servers.json 用 hutool AES(Base64)。教训26/27。
+6. **SparseArray 的 Kotlin `[]` 访问**：桌面等价类必须 `operator fun get/set`，且 `get` 声明非空（对齐 Android 平台类型语义），否则 mobi 代码 `tagMap[2].tagValues` 编译报错。
+7. **Backup 的 `GSON.toJson(list, OutputStream)` 不存在**：用 `GSON.writeToOutputStream(out, list)`（GsonExtensions）。
+
+### 12.3 已验证有效的方法（照用）
+- **vendored 库迁移流水线**：`python` 复制 + sed 替换（package 重命名、Log→me.ag2s.base.Log、Base64→java.util.Base64、Build→if(true)、NonNull 剥离）；AndroidZipFile/PfdHelper 手动 RandomAccessFile 重写；SparseArray/SynchronizedPool 桌面等价类。
+- **依赖**：`xmlpull:xmlpull:1.1.3.1` + `net.sf.kxml:kxml2:2.3.0`（epublib 的 org.xmlpull.v1）。
+- **本地书籍冒烟**：`--local-smoke-test`（TXT 规则选章注意死区/前言；EPUB 用程序生成最小合法 epub——mimetype 首位不压缩 + container.xml + content.opf + toc.ncx + chapter + cover；备份用"导出→清库→恢复→断言一致"round-trip + 手写 Legado fixture zip）。
+- **忠于原版核对**：归一化 diff 重叠率 TextFile 0.99 / UmdFile 1.00 / MobiFile 0.91 / EpubFile 0.93（差异均为文档化替换）。
+
+### 12.4 当前状态（2026-08-11 会话结束时）
+- Part 0/1/2/3/4/5/**6** ✅（--local-smoke-test 全过 + dao/net/rule/source/api 全 PASS），STATUS.json 已同步（lessons 追加 22~27；MCP 已删除）
+- remote main 最新：本会话提交后更新
+- 下一步：**Part 7 WebView 兼容 + Compose Multiplatform 前端**（T7.1 引擎层无头 WebView → T7.5 解除调用点裁剪 → T7.6~T7.8 Compose 前端），详见 PLAN.md 第 7.5 节与 docs/WEBVIEW-COMPOSE-PLAN.md

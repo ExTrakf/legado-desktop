@@ -60,7 +60,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 close()
             }
             searchBooks.clear()
-            bookSourceParts = appDb.bookSourceDao.allEnabledPart
+            bookSourceParts = callBack.getSearchScope().getBookSourceParts()
             if (bookSourceParts.isEmpty()) {
                 callBack.onSearchCancel(NoStackTraceException("启用书源为空"))
                 return
@@ -244,6 +244,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     }
 
     interface CallBack {
+        fun getSearchScope(): SearchScope
         fun onSearchStart()
         fun onSearchProgress(searched: Int, total: Int)
         fun onSearchSuccess(searchBooks: List<SearchBook>)

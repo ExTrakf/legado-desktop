@@ -34,6 +34,10 @@ dependencies {
     implementation("com.jayway.jsonpath:json-path:3.0.0")
     implementation("cn.wanghaomiao:JsoupXpath:2.5.3")
 
+    // 本地书籍解析（原版 vendored 库依赖）
+    implementation("xmlpull:xmlpull:1.1.3.1")
+    implementation("net.sf.kxml:kxml2:2.3.0")
+
     // JSON
     implementation("com.google.code.gson:gson:2.14.0")
 

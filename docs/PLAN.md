@@ -7,7 +7,7 @@
 
 - 后端：Kotlin 2.4.10 + Gradle 8.14.4 + sqlite-jdbc + OkHttp + NanoHTTPD + Rhino（htmlunit-core-js fork）
 - 数据层：SQLite schema v99（对齐 Legado Room），24 实体表 + 1 视图（book_sources_part）
-- 服务：NanoHTTPD HTTP + WebSocket + Ktor MCP（127.0.0.1:2323，CORS 全开）
+- 服务：NanoHTTPD HTTP + WebSocket（127.0.0.1:2323，CORS 全开）
 - 运行：`installDist` 直接脚本（5 秒就绪，绕开 Gradle daemon）
 
 ## 1. Part 依赖图
@@ -18,8 +18,8 @@ Part 0 基础与构建（✅ DONE）
         └─> Part 2 配置与网络层（✅ DONE：--net-smoke-test 16 项断言全过）
               └─> Part 3 规则引擎（AnalyzeRule + Rhino）
                     └─> Part 4 书源与读书引擎（SourceHelp/jsSource/WebBook）
-                          └─> Part 5 API 层（HTTP/WS/MCP 控制器）
-                                └─> Part 6 本地书籍/图片/MCP/备份（可选增强）
+                          └─> Part 5 API 层（HTTP/WS 控制器）
+                                └─> Part 6 本地书籍/封面/图片/备份（可选增强）
 ```
 
 依赖规则：Part N 必须完整验收后进入 Part N+1；每个 Task 完成后立即测试。
@@ -124,8 +124,7 @@ Part 0 基础与构建（✅ DONE）
 |---|---|---|
 | T6.1 | 本地书籍解析（localBook 已暂删，重新迁移：TXT/EPUB/MOBI/UMD） | 导入 txt/epub 可读 |
 | T6.2 | 封面/图片接口（ImageUtils 解密 + BookCover 恢复） | cover/image 返回字节 |
-| T6.3 | MCP 服务（web/mcp 已迁移，T5 后接入） | MCP 工具列表可枚举 |
-| T6.4 | 备份/导入兼容（storage/Backup 等已暂删，重新迁移） | 导入 Legado 备份 JSON |
+| T6.3 | 备份/导入兼容（storage/Backup 等已暂删，重新迁移） | 导入 Legado 备份 JSON |
 
 ## 7.5 Part 7 WebView 兼容 + Compose Multiplatform 前端（规划中）
 

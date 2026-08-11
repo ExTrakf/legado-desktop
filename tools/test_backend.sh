@@ -194,6 +194,17 @@ else
   grep "❌" /tmp/legado_api_smoke.log | head -10
 fi
 
+# ---------- 4.11 Part6 本地书籍/封面图片/备份导入冒烟（T6.1 本地解析 + T6.2 封面图片 + T6.3 备份导入） ----------
+echo "== 4.11 Part6 本地书籍/封面图片/备份导入冒烟（--local-smoke-test） =="
+LEGADO_DESKTOP_HOME="$LEGADO_DESKTOP_HOME" "$BIN" --local-smoke-test > /tmp/legado_local_smoke.log 2>&1
+LOCAL_EXIT=$?
+if [ $LOCAL_EXIT -eq 0 ]; then
+  ok "Part6 冒烟全部通过（$(grep -c '✅' /tmp/legado_local_smoke.log) 项断言）"
+else
+  bad "Part6 冒烟失败（exit=$LOCAL_EXIT）"
+  grep "❌" /tmp/legado_local_smoke.log | head -10
+fi
+
 # ---------- 5. 停止服务 ----------
 echo "== 5. 停止服务 =="
 if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null; echo "  killed server pid=$SERVER_PID"; fi

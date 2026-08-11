@@ -9,14 +9,33 @@ import io.legado.desktop.help.book.ContentProcessor
 import io.legado.desktop.help.book.isLocal
 import io.legado.desktop.help.config.AppConfig
 import io.legado.desktop.help.CacheManager
+import io.legado.desktop.model.analyzeRule.AnalyzeUrl
+import io.legado.desktop.model.ImageProvider
+import io.legado.desktop.model.localBook.LocalBook
 import io.legado.desktop.model.webBook.WebBook
 import io.legado.desktop.utils.GSON
 import io.legado.desktop.utils.cnCompare
 import io.legado.desktop.utils.fromJsonObject
+import io.legado.desktop.utils.isAbsUrl
 import io.legado.desktop.utils.printOnDebug
 import io.legado.desktop.utils.stackTraceStr
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import java.io.File
+
+private val windowsDrivePrefix = Regex("^[A-Za-z]:")
+
+internal fun requireSafeUploadedBookFileName(fileName: String): String {
+    val isUnsafe = fileName.isBlank() ||
+            fileName == "." ||
+            fileName == ".." ||
+            fileName.indexOfAny(charArrayOf('/', '\\')) >= 0 ||
+            windowsDrivePrefix.containsMatchIn(fileName) ||
+            fileName.any { Character.isISOControl(it) }
+    require(!isUnsafe) { "Invalid uploaded book file name" }
+    return fileName
+}
 
 object BookController {
 
@@ -45,18 +64,56 @@ object BookController {
 
     /**
      * 获取封面
-     * 原版走 Glide + BookCover（桌面版 T6.2 实现图片解密/封面恢复）
+     * 原版走 Glide + BookCover；桌面返回封面文件字节（HttpServer 按 image 响应）
      */
     fun getCover(parameters: Map<String, List<String>>): ReturnData {
-        return ReturnData().setErrorMsg("封面功能在 T6.2 实现")
+        val returnData = ReturnData()
+        val coverPath = parameters["path"]?.firstOrNull()
+        if (coverPath.isNullOrEmpty()) {
+            return returnData.setErrorMsg("path不能为空")
+        }
+        val bytes = runBlocking {
+            if (coverPath.isAbsUrl()) {
+                AnalyzeUrl(coverPath, callTimeout = 0, coroutineContext = currentCoroutineContext())
+                    .getByteArrayAwait()
+            } else if (File(coverPath).exists()) {
+                File(coverPath).readBytes()
+            } else {
+                null
+            }
+        }
+        if (bytes != null) {
+            return returnData.setData(bytes)
+        }
+        // 原版默认封面占位；桌面无法生成时返回错误
+        return returnData.setErrorMsg("封面获取失败")
     }
 
     /**
      * 获取正文图片
-     * 原版走 ImageProvider/ImageUtils（桌面版 T6.2 实现）
+     * 原版 ImageProvider 缓存 + 解码 Bitmap；桌面返回图片文件字节
      */
     fun getImg(parameters: Map<String, List<String>>): ReturnData {
-        return ReturnData().setErrorMsg("图片功能在 T6.2 实现")
+        val returnData = ReturnData()
+        val bookUrl = parameters["url"]?.firstOrNull()
+        if (bookUrl.isNullOrBlank()) {
+            return returnData.setErrorMsg("bookUrl为空")
+        }
+        val src = parameters["path"]?.firstOrNull()
+            ?: return returnData.setErrorMsg("图片链接为空")
+        val width = parameters["width"]?.firstOrNull()?.toInt() ?: 640
+        val book = appDb.bookDao.getBook(bookUrl)
+            ?: return returnData.setErrorMsg("bookUrl不对")
+        val bookSource = appDb.bookSourceDao.getBookSource(book.origin)
+        val bytes = runBlocking {
+            ImageProvider.cacheImage(book, src, bookSource)
+            ImageProvider.getImageBytes(book, src, width)
+        }
+        return if (bytes != null) {
+            returnData.setData(bytes)
+        } else {
+            returnData.setErrorMsg("图片获取失败")
+        }
     }
 
     /**
@@ -72,8 +129,11 @@ object BookController {
             val book = appDb.bookDao.getBook(bookUrl)
                 ?: return returnData.setErrorMsg("未在数据库找到对应书籍，请先添加")
             if (book.isLocal) {
-                // 原 LocalBook.getChapterList，T6.1 本地书籍解析实现
-                return returnData.setErrorMsg("本地书籍目录刷新在 T6.1 实现")
+                val toc = LocalBook.getChapterList(book)
+                appDb.bookChapterDao.delByBook(book.bookUrl)
+                appDb.bookChapterDao.insert(*toc.toTypedArray())
+                appDb.bookDao.update(book)
+                return returnData.setData(toc)
             } else {
                 val bookSource = appDb.bookSourceDao.getBookSource(book.origin)
                     ?: return returnData.setErrorMsg("未找到对应书源,请换源")
@@ -210,13 +270,31 @@ object BookController {
 
     /**
      * 添加本地书籍
-     * 原 LocalBook.saveBookFile/importFile，T6.1 本地书籍解析实现
      */
     fun addLocalBook(
         parameters: Map<String, List<String>>,
         files: Map<String, String>
     ): ReturnData {
-        return ReturnData().setErrorMsg("本地书籍导入在 T6.1 实现")
+        val returnData = ReturnData()
+        val rawFileName = parameters["fileName"]?.firstOrNull()
+            ?: return returnData.setErrorMsg("fileName 不能为空")
+        val fileName = kotlin.runCatching {
+            requireSafeUploadedBookFileName(rawFileName)
+        }.getOrElse {
+            return returnData.setErrorMsg("fileName 格式不正确")
+        }
+        val fileData = files["fileData"]
+            ?: return returnData.setErrorMsg("fileData 不能为空")
+        kotlin.runCatching {
+            val path = LocalBook.saveBookFile(File(fileData).inputStream(), fileName)
+            LocalBook.importFile(path)
+        }.onFailure {
+            return when (it) {
+                is SecurityException -> returnData.setErrorMsg("需重新设置书籍保存位置!")
+                else -> returnData.setErrorMsg("保存书籍错误\n${it.localizedMessage}")
+            }
+        }
+        return returnData.setData(true)
     }
 
     /**

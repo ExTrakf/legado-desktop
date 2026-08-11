@@ -17,8 +17,10 @@ import io.legado.desktop.exception.NoStackTraceException
 import io.legado.desktop.help.RuleBigDataHelp
 import io.legado.desktop.help.config.AppConfig
 import io.legado.desktop.model.analyzeRule.CustomUrl
+import io.legado.desktop.model.localBook.LocalBook
 import io.legado.desktop.utils.GSON
 import io.legado.desktop.utils.MD5Utils
+import io.legado.desktop.utils.isUri
 import io.legado.desktop.utils.normalizeFileName
 import java.io.File
 import java.time.LocalDate
@@ -101,13 +103,66 @@ fun Book.contains(word: String?): Boolean {
             || intro?.contains(word) == true
 }
 
-/** 桌面版：本地书籍路径（String），不存在返回 null */
+private val localUriCache = ConcurrentHashMap<String, String>()
+
+/** 桌面版：本地书籍路径（String）。缓存 + 书库目录回退查找，语义对齐原版 getLocalUri */
 fun Book.getLocalUri(): String? {
     if (!isLocal) {
         throw NoStackTraceException("不是本地书籍")
     }
-    val path = bookUrl.removePrefix("file://")
-    return if (java.io.File(path).exists()) path else null
+    var path = localUriCache[bookUrl]
+    if (path != null) {
+        return path
+    }
+    path = if (bookUrl.isUri()) {
+        bookUrl.removePrefix("file://")
+    } else {
+        bookUrl
+    }
+    if (File(path).exists()) {
+        cacheLocalUri(path)
+        return path
+    }
+    // bookUrl 路径失效时，尝试在书籍保存目录下按文件名查找
+    val defaultBookDir = AppConfig.defaultBookTreeUri
+        ?: io.legado.desktop.env.DesktopEnv.booksDir.toString()
+    findLocalBookFile(File(defaultBookDir), originName, 5)?.let {
+        cacheLocalUri(it.absolutePath)
+        return it.absolutePath
+    }
+    cacheLocalUri(path)
+    return path
+}
+
+fun Book.getArchiveUri(): String? {
+    val defaultBookDir = AppConfig.defaultBookTreeUri
+        ?: io.legado.desktop.env.DesktopEnv.booksDir.toString()
+    return if (isArchive) {
+        findLocalBookFile(File(defaultBookDir), archiveName)?.absolutePath
+    } else {
+        null
+    }
+}
+
+fun Book.cacheLocalUri(path: String) {
+    localUriCache[bookUrl] = path
+}
+
+fun Book.removeLocalUriCache() {
+    localUriCache.remove(bookUrl)
+}
+
+/** 在目录及其子目录（depth 层内）中查找指定文件名的文件 */
+private fun findLocalBookFile(root: File, fileName: String, depth: Int = 5): File? {
+    if (!root.isDirectory) return null
+    root.listFiles()?.forEach { f ->
+        if (f.isFile) {
+            if (f.name == fileName) return f
+        } else if (depth > 0) {
+            findLocalBookFile(f, fileName, depth - 1)?.let { return it }
+        }
+    }
+    return null
 }
 
 fun Book.getRemoteUrl(): String? {
@@ -219,8 +274,7 @@ fun Book.getBookSource(): BookSource? {
 }
 
 fun Book.isLocalModified(): Boolean {
-    // 本地书籍修改检测在 T6.1 实现（原版基于本地文件修改时间）
-    return false
+    return isLocal && LocalBook.getLastModified(this).getOrDefault(0L) > latestChapterTime
 }
 
 fun Book.releaseHtmlData() {

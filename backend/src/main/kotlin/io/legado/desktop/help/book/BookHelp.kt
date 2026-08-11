@@ -13,7 +13,9 @@ import io.legado.desktop.data.entities.getFolderName
 import io.legado.desktop.data.entities.isEpub
 import io.legado.desktop.help.config.AppConfig
 import io.legado.desktop.model.analyzeRule.AnalyzeUrl
+import io.legado.desktop.model.localBook.LocalBook
 import io.legado.desktop.utils.ArchiveUtils
+import io.legado.desktop.utils.ImageUtils
 import io.legado.desktop.utils.FileUtils
 import io.legado.desktop.utils.onEachParallel
 import io.legado.desktop.utils.postEvent
@@ -343,11 +345,17 @@ object BookHelp {
                 src, source = bookSource, coroutineContext = currentCoroutineContext()
             )
             val bytes = analyzeUrl.getByteArrayAwait()
-            // 桌面版：暂不支持图片解密（原 ImageUtils.decode），直接写入原始字节
-            if (!checkImage(bytes)) {
-                AppLog.put("${book.name} ${chapter?.title} 图片 $src 下载错误 数据异常")
+            //某些图片是加密的，需要二次解密
+            runScriptWithContext {
+                ImageUtils.decode(
+                    src, bytes, isCover = false, bookSource, book
+                )
+            }?.let {
+                if (!checkImage(it)) {
+                    AppLog.put("${book.name} ${chapter?.title} 图片 $src 下载错误 数据异常")
+                }
+                writeImage(book, src, it)
             }
-            writeImage(book, src, bytes)
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
             val msg = "${book.name} ${chapter?.title} 图片 $src 下载失败\n${e.localizedMessage}"
@@ -385,6 +393,13 @@ object BookHelp {
     fun getEpubFile(book: Book): ZipFile {
         val uri = book.getLocalUri() ?: throw IOException("本地书籍文件不存在")
         return ZipFile(uri)
+    }
+
+    /**
+     * 本地书籍文件（对应原 BookHelp.getBookPFD，桌面返回 File）
+     */
+    fun getBookFile(book: Book): File? {
+        return book.getLocalUri()?.let { File(it) }
     }
 
     /**
@@ -500,8 +515,11 @@ object BookHelp {
             return string
         }
         if (book.isLocal) {
-            // 本地书籍内容读取在 T6.1 实现（原 LocalBook.getContent）
-            return null
+            val string = LocalBook.getContent(book, bookChapter)
+            if (string != null && book.isEpub) {
+                saveText(book, bookChapter, string)
+            }
+            return string
         }
         return null
     }

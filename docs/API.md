@@ -27,7 +27,6 @@
 - [x] `POST /saveJsSource` — JS 书源导入（text/plain + 令牌）
 - [x] `WS /searchBook` — 多源搜索
 - [x] `WS /bookSourceDebug` `WS /rssSourceDebug` — 源调试
-- [ ] MCP `/mcp`（Streamable HTTP，Ktor）— 可选（T6.3）
 
 ## 路由细节
 

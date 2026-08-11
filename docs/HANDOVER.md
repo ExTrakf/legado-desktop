@@ -439,3 +439,45 @@
 - Part 0/1/2/3/4/5/6 done + **Part 7 引擎层 T7.1~T7.5 done**（--webview-smoke-test 11 [PASS] + compileKotlin 0 错误），STATUS.json 已同步（lessons 追加 28~33；notDoing 更新为仅登录 UI 渲染/可见 WebView/webkit Cookie 不移植）
 - remote main 最新：本会话提交后更新
 - 下一步：**T7.0 JCEF 落地**（backend 引入 JCEF 依赖 → 核实 jcefmaven 坐标 → DesktopWebViewFactory.creator 接 JCEF 实现 → offscreen 最小加载/executeJavaScript/JS 桥真实验证 → 追加 --webview-smoke-test 真实段），详见 STATUS.json blockedBy 与 PLAN.md 第 7.5 节
+
+## 14. Part 7 T7.0 JCEF 接入会话经验（2026-08-11，交接给下一会话）
+
+> 本会话从「选型确认（JCEF 直连）→ 依赖核实 → 探针验证 → 实现 CefEnv/JcefDesktopWebView → 导航竞态修复 → 冒烟真实段 → 连跑验证」全程完成。
+> **结论：T7.0 完成，引擎层 T7.0~T7.5 全部就绪；--webview-smoke-test 15 项断言（11 纯逻辑 + 4 真实 JCEF）连跑 3 次全绿。**
+
+### 14.1 本轮完成
+- **依赖**：`me.friwi:jcefmaven:146.0.10`（Maven Central；jcef-api + jogl-all/gluegen-rt v2.4.0）；OSR 需要 `--add-exports java.base/java.lang、java.desktop/sun.awt、java.desktop/sun.java2d`（applicationDefaultJvmArgs 已配）；bundle（Chromium natives **~350MB**，非文档估的 200MB）首次运行下载到 `<数据目录>/jcef-bundle`
+- **T7.0 探针 `--jcef-probe`**（JcefProbe.kt）：先验证 OSR——**失败**：OSR(JOGL) 无 GL 表面时 load 事件不推进；改 **windowless_rendering_enabled=false + 隐藏 AWT Frame（1x1 无装饰屏幕外）+ createBrowser(url, false, false)**，由 EDT 驱动消息循环，`hello-jcef` 取回成功
+- **`help/webView/CefEnv.kt`**：全局单例初始化（CefAppBuilder + bundleDir，幂等）
+- **`help/webView/CefWebView.kt`**：`init()` 接线 `DesktopWebViewFactory.creator = { JcefDesktopWebView() }`；`bundleReady()`；bundleDir env 可覆盖；Main 里 `LEGADO_DESKTOP_ENABLE_JCEF=1` 启用
+- **`help/webView/JcefDesktopWebView.kt`**：完整实现 DesktopWebView——
+  - loadUrl（无 header→loadURL；有 header→CefRequest+loadRequest）、loadHtml（**data: URL**，偏差：相对资源不解析）
+  - **evaluateJavascript**：自包含注入 `window.__legadoEval` helper → `eval(js)` → `cefQuery('legado:eval:<id>:<enc>')` → Java pendingEval 回调（结果 JSON 风格，对齐 Android；ERR→"null" 触发 BackstageWebView 重试）
+  - onLoadEnd(main frame)→onPageFinished；onLoadingStateChange→isLoading；onBeforeBrowse→CefRequestHandler.onBeforeBrowse；onResourceLoad→**getResourceRequestHandler 返回 CefResourceRequestHandler**（此版本 API 变更）；onCertificateError→callback.Continue()（原 onReceivedSslError→proceed）；console→CefDisplayHandler
+  - **JS 桥**：addJavascriptInterface → 页面注入 `window.<name>` Proxy，任意方法经 `cefQuery('legado:invoke:<b64 JSON>')` 反射回 Java；`getFromMemory` 同步语义用页面 `_memData` 对象（JSBridgeResult 协议），evaluateJavascript 命中 JSBridgeResult 模式时前置注入数据
+  - **导航竞态**：readyForNav + isLoading 判定，未就绪/加载中 loadURL 挂起、onLoadingStateChange(false) 空闲时应用
+  - destroy→browser.close(true)+frame.dispose()+client.dispose()
+- **冒烟**：`--webview-smoke-test` 追加 JCEF 真实段（4 项）——真实加载 URL/HTML + eval 取回 innerText、sourceRegex onResourceLoad（img.png）、JS 桥往返；bundle 未下载时 [SKIP] 降级不失败；**连跑 3 次全绿（15/15）**
+- 无回归：--dao-smoke-test / --net-smoke-test 仍全绿
+
+### 14.2 本轮新踩的坑（别重踩）
+1. **OSR(JOGL) 离屏模式不推进 load（T7.0 最致命）**：jcefmaven 默认 windowless_rendering_enabled=true，但 OSR 需要 JOGL GL 表面；无窗口/无 GLCanvas 时浏览器创建后 load 事件完全不触发（onLoadStart/onLoadEnd 均无）。**修复：windowless_rendering_enabled=false + 隐藏 AWT Frame（1x1 屏幕外）承载 browser.getUIComponent()，EDT 自动驱动消息循环**。教训35。
+2. **executeJavaScript/loadURL 必须从 CEF/EDT 线程调用**：从其它线程（协程/调度线程）调用被**静默丢弃**——BackstageWebView 在 DesktopHandler 线程调 evaluateJavascript 时页面 JS 不执行且无错误。修复：SwingUtilities.invokeLater 包装（onCefThread）。教训35。
+3. **浏览器加载中调用 loadURL 会被丢弃**：浏览器创建时的初始 about:blank（或池复位 about:blank）加载中调 loadURL 无效果，页面永远停在 about:blank（eval 恒 null → BackstageWebView "js执行超时"）。**修复：readyForNav（首个 onLoadingStateChange(false)/onLoadEnd 后为真）+ isLoading 判定，未就绪/加载中挂起 pendingNav，空闲时应用**。教训36。
+4. **`isLoading` 标志单独用会踩初始竞态**：初始 about:blank 的 onLoadingStateChange(true) 可能晚于 loadUrl 调用送达（volatile 仍为 false）→ 直接 loadURL 被丢弃。**必须配 readyForNav**。教训36。
+5. **此版本 CefRequestHandler API 变更**：`onBeforeResourceLoad` 移到 `getResourceRequestHandler()` 返回的 `CefResourceRequestHandler.onBeforeResourceLoad`（返回 Boolean，true=取消）；`onBeforeBrowse` 5 参（无 transitionType）；SSL 用 `onCertificateError(...): Boolean` + callback.Continue()；`CefPostDataElement.setToBytes(int count, byte[])`；`CefBrowser` 无 dispose（用 close(true)）；`doMessageLoopWork(long)`。
+6. **JS 桥同步语义**：cefQuery 是异步的，无法完全复刻 addJavascriptInterface 的同步返回；`getFromMemory` 用页面 `_memData` 对象实现同步（JSBridgeResult 协议要求）；其余方法返回值为异步（已知偏差，文档化）。
+7. **测试 URL 断言双斜杠**：pageUrl 以 '/' 结尾，`"$pageUrl/img.png"` 拼出 `//img.png` 导致断言误报——用 `pageUrl.trimEnd('/') + "/img.png"`。
+
+### 14.3 已验证有效的方法（照用）
+- **隐藏窗口承载 JCEF**：非 OSR + 1x1 无装饰 Frame（setLocation(-10000,-10000)）由 EDT 驱动——探针/冒烟全部通过，无需手动 doMessageLoopWork。
+- **JS 往返模板**：CefMessageRouter + `window.cefQuery`；evaluateJavascript 自包含注入 `window.__legadoEval`（不依赖 onLoadStart 注入，杜绝注入丢失）；结果经 cefQuery 编码回 Java，pendingEval(ConcurrentHashMap<Long, cb>) 按 id 分发。
+- **JS 桥模板**：addJavascriptInterface(bridge, name) 存 map → onLoadStart 注入 `window.<name>=new Proxy(...)`（get 陷阱返回函数，参数序列化 btoa(JSON)）→ Java onQuery 反射 method.invoke；args 按参数类型转换（Number/Boolean/Array<String?>）。
+- **cache 同步**：evaluateJavascript 命中 `window.<JSBridgeResult>('id', bool)` 正则时，从 CacheManager.getFromMemory(id) 取数据前置注入 `window.<nameCache>._memData[id]`，实现 JSBridgeResult 内 `cache.getFromMemory(id)` 同步读。
+- **bundle 就绪判定**：bundleDir.listFiles() any { name startsWith "libcef" or "jcef" }。
+- **Windows 验证**：cmd /c 原生重定向 + [IO.File]::ReadAllText(file, UTF8) 读回；断言数 [regex]::Matches(raw, '\[PASS\]').Count。
+
+### 14.4 当前状态（2026-08-11 会话结束时）
+- Part 0/1/2/3/4/5/6 done + **Part 7 引擎层 T7.0~T7.5 done**（--webview-smoke-test 15 [PASS] 连跑 3 次全绿；无 bundle 降级 [SKIP] 不失败；--dao/--net 无回归），STATUS.json 已同步（lessons 追加 34~36；T7.0 置 done）
+- remote main 最新：本会话提交后更新
+- 下一步：**Compose Multiplatform 前端**（T7.6 骨架 → T7.7 书架/书源/阅读 → T7.8 前端 WebView 集成 + Part7 联测），见 PLAN.md 第 7.5 节

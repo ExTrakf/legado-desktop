@@ -5,6 +5,7 @@ import io.legado.desktop.help.CacheManager
 import io.legado.desktop.help.http.BackstageWebView
 import io.legado.desktop.help.webView.DesktopWebView
 import io.legado.desktop.help.webView.DesktopWebViewFactory
+import io.legado.desktop.help.webView.JcefDesktopWebView
 import io.legado.desktop.help.webView.WebJsExtensions
 import io.legado.desktop.help.webView.WebViewPool
 import io.legado.desktop.help.webView.toWebViewRequestConfig
@@ -242,10 +243,129 @@ object WebViewSmokeTest {
             WebViewPool.resetForTest()
         }
 
-        // ================= JCEF 真实浏览器（后置）=================
-        println("  [SKIP] JCEF 真实浏览器断言（offscreen 加载/executeJavaScript/JS 桥）在 T7.0 验证步骤追加，本次跳过")
+        // ================= JCEF 真实浏览器（T7.0，bundle 就绪才执行）=================
+        val cefBundle = io.legado.desktop.help.webView.CefWebView.bundleDir
+        if (!io.legado.desktop.help.webView.CefWebView.bundleReady()) {
+            println("  [SKIP] JCEF bundle 未下载（$cefBundle），真实浏览器段跳过；首次需下载 ~350MB（--jcef-probe 或 LEGADO_DESKTOP_ENABLE_JCEF=1 触发）")
+        } else {
+            runJcefRealTests(fail) { name, block -> check(name, block) }
+        }
 
         return fail
+    }
+
+    /**
+     * JCEF 真实浏览器断言（T7.0 验收：真实加载 + executeJavaScript 取回结果 + JS 桥 + 资源拦截）。
+     * 仅当 bundle 已下载时执行（真实 Chromium，不能编造结果）。
+     */
+    private fun runJcefRealTests(
+        fail: Int,
+        check: (String, () -> Unit) -> Unit,
+    ) {
+        val server = com.sun.net.httpserver.HttpServer.create(java.net.InetSocketAddress(0), 0)
+        val png = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        )
+        server.createContext("/") { ex ->
+            val body = "<html><body>real-jcef-hello<img src=\"/img.png\"></body></html>"
+                .toByteArray(Charsets.UTF_8)
+            ex.responseHeaders.add("Content-Type", "text/html; charset=utf-8")
+            ex.sendResponseHeaders(200, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+        server.createContext("/img.png") { ex ->
+            ex.responseHeaders.add("Content-Type", "image/png")
+            ex.sendResponseHeaders(200, png.size.toLong())
+            ex.responseBody.use { it.write(png) }
+        }
+        server.start()
+        val pageUrl = "http://127.0.0.1:${server.address.port}/"
+        try {
+            io.legado.desktop.help.webView.CefWebView.init()
+
+            check("T7.0 真实加载 URL + evaluateJavaScript 取回正文") {
+                WebViewPool.resetForTest()
+                val body = runBlocking {
+                    withTimeout(60_000) {
+                        BackstageWebView(
+                            url = pageUrl,
+                            javaScript = "document.body.innerText",
+                            delayTime = 0
+                        ).getStrResponse().body
+                    }
+                }
+                println("  [INFO] URL innerText: '$body'")
+                require(body == "real-jcef-hello") { "期望 'real-jcef-hello' 实际 '$body'" }
+                WebViewPool.resetForTest()
+            }
+
+            check("T7.0 真实加载 HTML(data:) + evaluateJavaScript 取回正文") {
+                WebViewPool.resetForTest()
+                val body = runBlocking {
+                    withTimeout(60_000) {
+                        BackstageWebView(
+                            url = "https://inline-js.local/",
+                            html = "<html><body>inline-js-hello</body></html>",
+                            javaScript = "document.body.innerText",
+                            delayTime = 0
+                        ).getStrResponse().body
+                    }
+                }
+                println("  [INFO] HTML innerText: '$body'")
+                require(body == "inline-js-hello") { "期望 'inline-js-hello' 实际 '$body'" }
+                WebViewPool.resetForTest()
+            }
+
+            check("T7.0 真实 sourceRegex 资源匹配（onResourceLoad）") {
+                WebViewPool.resetForTest()
+                val body = runBlocking {
+                    withTimeout(30_000) {
+                        BackstageWebView(
+                            url = pageUrl,
+                            sourceRegex = ".*\\.png",
+                            delayTime = 0
+                        ).getStrResponse().body
+                    }
+                }
+                require(body == pageUrl.trimEnd('/') + "/img.png") { "期望图片 URL 实际 '$body'" }
+                WebViewPool.resetForTest()
+            }
+
+            check("T7.0 真实 JS 桥（addJavascriptInterface → 页面调用 → Java 收到）") {
+                val wv = JcefDesktopWebView()
+                val got = java.util.concurrent.CopyOnWriteArrayList<String>()
+                wv.addJavascriptInterface(object {
+                    @Suppress("unused")
+                    fun hello(name: String): String {
+                        got.add(name)
+                        return "hi:$name"
+                    }
+                }, "probeBridge")
+                runBlocking {
+                    withTimeout(30_000) {
+                        wv.onPageFinished = {
+                            // 页面加载完成后从页面调用 window.probeBridge.hello('from-js')
+                            wv.evaluateJavascript("window.probeBridge.hello('from-js');", null)
+                        }
+                        wv.loadHtml(
+                            "<html><body>bridge</body></html>",
+                            "https://bridge.local/",
+                            "utf-8"
+                        )
+                        var waited = 0
+                        while (got.isEmpty() && waited < 15000) {
+                            Thread.sleep(100)
+                            waited += 100
+                        }
+                        require(got.isNotEmpty()) { "JS 桥调用未到达 Java" }
+                        require(got.first() == "from-js") { "期望 from-js 实际 ${got.first()}" }
+                    }
+                }
+                wv.destroy()
+            }
+        } finally {
+            server.stop(0)
+        }
     }
 
     /**

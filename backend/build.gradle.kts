@@ -12,6 +12,12 @@ kotlin {
 
 application {
     mainClass.set("io.legado.desktop.MainKt")
+    // OSR（离屏渲染）模式需要 JOGL 的 --add-exports（JCEF/jcefmaven 要求，JDK16+）
+    applicationDefaultJvmArgs = listOf(
+        "--add-exports", "java.base/java.lang=ALL-UNNAMED",
+        "--add-exports", "java.desktop/sun.awt=ALL-UNNAMED",
+        "--add-exports", "java.desktop/sun.java2d=ALL-UNNAMED",
+    )
 }
 
 // 版本对齐 legado gradle/libs.versions.toml（2026-08-10 snapshot）
@@ -52,6 +58,9 @@ dependencies {
     implementation("cn.hutool:hutool-crypto:5.8.22")
     implementation("org.apache.commons:commons-text:1.13.1")
     implementation("com.github.liuyueyi.quick-chinese-transfer:quick-transfer-core:0.2.17")
+
+    // WebView 引擎（JCEF，Part 7 T7.0）：chromiumembedded/java-cef 的 Maven 制品（natives 首次运行下载）
+    implementation("me.friwi:jcefmaven:146.0.10")
 
     testImplementation(kotlin("test"))
 }

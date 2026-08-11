@@ -59,17 +59,18 @@
     "教训30：runBlocking 单线程事件循环被 busy-wait 阻塞——runBlocking 的 async 调度的协程要等主协程挂起才执行，Thread.sleep 型 waitUntil 不挂起导致协程永不启动（getStrResponse 永远不跑、fake 无任何调用）。修复：挂起调用用 CoroutineScope(Dispatchers.Default).async 跑独立线程池，再 await",
     "教训31：internal 类型跨包引用必须显式 import——WebViewRequestConfig 是 help.webView 的 internal data class，BackstageWebView（help.http）引用其类型/扩展函数时必须 import，否则 Unresolved reference",
     "教训32：lambda 赋值给属性时 return@属性名 标签非法——onPageFinished = { url -> if(...) return@onPageFinished } 编译报 Unresolved label；属性名不是 lambda 标签，改 if/else 结构（语义等价）",
-    "教训33：桌面 evaluateJavascript 结果回调是 String?（Android ValueCallback 非空）——BackstageWebView.handleResult 用 it ?: \"null\" 保证空值走 retry 分支（语义等价）"
+    "教训33：桌面 evaluateJavascript 结果回调是 String?（Android ValueCallback 非空）——BackstageWebView.handleResult 用 it ?: \"null\" 保证空值走 retry 分支（语义等价）",
+    "教训34：2026-08-11 全量复核完成——原版后端业务 518 文件 vs 桌面 347 文件；209 个缺失文件绝大多数为 Android UI 专属/明确不移植；真缺口 6 项（不在明确不移植清单）：AutoTask 定时任务引擎（model/AutoTask* 4 文件，仅 DAO/CronSchedule 已迁）、CacheBook 缓存书籍（model/CacheBook.kt）、Download 下载（model/Download.kt 抛错 stub，桌面无调用方）、WebDAV（help/AppWebDav + lib/webdav + model/remote，可选）、rar/7z 解压（utils/compress/LibArchiveUtils，桌面仅 zip）、默认数据导入（DefaultData.importDefault* 死代码 + keyboardAssists 建库不 seed）。完整清单与执行顺序见 docs/GAPS.md",
+    "教训35：JCEF（jcefmaven me.friwi:jcefmaven:146.0.10）集成关键结论：①OSR 离屏模式（JOGL）无 GL 表面时 load 事件不推进，必须 windowless_rendering_enabled=false + 隐藏 AWT Frame（1x1 无装饰屏幕外）承载浏览器，由 EDT 驱动消息循环；②executeJavaScript/loadURL 必须从 CEF/EDT 线程调用，其它线程调用被静默丢弃（用 SwingUtilities.invokeLater 包装）；③浏览器加载中调用 loadURL 会被丢弃——导航需 readyForNav+isLoading 判定，未就绪/加载中挂起、onLoadingStateChange(false) 空闲时应用；④JS 往返用 CefMessageRouter（cefQuery），evaluateJavascript 经 __legadoEval helper eval 后结果 JSON 风格返回（对齐 Android）；⑤JS 桥用 window.<name> Proxy 经 cefQuery 反射回 Java，getFromMemory 同步语义用页面 _memData 对象实现；⑥bundle（Chromium natives ~350MB）首次运行下载；⑦此版本 CefRequestHandler 的 onBeforeResourceLoad 移到 getResourceRequestHandler 返回的 CefResourceRequestHandler，SSL 错误用 onCertificateError+callback.Continue()",
+    "教训36：JCEF 桥/事件有竞态——浏览器创建后立即 loadURL 会被丢弃（初始 about:blank 或池复位 about:blank 加载中）；用 readyForNav（首个空闲态）+ isLoading 判定挂起导航，避免重复下载/丢弃；测试断言 URL 拼接注意 pageUrl 以 '/' 结尾（pageUrl+path 会出现双斜杠）"
   ],
   "current": {
     "part": 7,
-    "task": "T7.1~T7.5 引擎层 WebView 兼容（纯代码，JCEF 接入待 T7.0 验证）",
-    "taskStatus": "in_progress",
-    "whatImDoing": "Part 7 引擎层：KCEF 已废弃（2025-10-28 归档），选型改为 JCEF 直连 + backend 直接引入；T7.1 WebViewRequestConfig/PooledWebView 逐字迁移 + DesktopWebView 抽象（JCEF 接缝）；T7.2 WebViewPool 复用池 + 清理协程（逻辑逐字）；T7.3 WebJsExtensions request 分发逐字 + RssJsExtensions 桌面基类 + JS 桥往返；T7.4 BackstageWebView 编排（sourceRegex/overrideUrlRegex/delayTime/timeout/cacheFirst/isRule）；T7.5 解除 AnalyzeRule.getWebJsResult/AnalyzeUrl.useWebView/JsExtensions.webView* 裁剪；--webview-smoke-test 11 项断言（Fake DesktopWebView 驱动纯逻辑）全过；JCEF 真实浏览器（offscreen 加载/executeJavaScript/JS 桥）断言与依赖下载后置到 T7.0 验证步骤",
-    "blockedBy": [
-      "JCEF 依赖引入 + Chromium bundle 下载 + offscreen 最小加载验证（T7.0，需真实环境验证，不能编造）"
-    ],
-    "nextAfterThis": "T7.0 落地：backend 引入 JCEF（jcefmaven/org.cef 坐标核实）→ 配置 DesktopWebViewFactory.creator 为 JCEF 实现 → offscreen 最小加载/executeJavaScript 真实验证 → 追加 --webview-smoke-test 真实浏览器段 → 再做 Compose 前端（T7.6~T7.8）"
+    "task": "T7.0~T7.5 引擎层 WebView 兼容全部完成（JCEF 直连 + 真实浏览器验证通过）",
+    "taskStatus": "done",
+    "whatImDoing": "Part 7 引擎层完成：T7.0 JCEF 落地——me.friwi:jcefmaven:146.0.10 + CefEnv（非 OSR + 隐藏 AWT Frame，EDT 驱动）+ JcefDesktopWebView（loadURL/loadHtml[data:]/evaluateJavascript[__legadoEval+cefQuery 往返]/onBeforeBrowse/onResourceLoad/console/SSL proceed/JS 桥 Proxy 反射 + _memData 同步）+ DesktopWebViewFactory.creator 接线（CefWebView.init，LEGADO_DESKTOP_ENABLE_JCEF=1 启用）；导航竞态修复（readyForNav+isLoading 挂起）；--webview-smoke-test 15 项断言（11 纯逻辑 + 4 真实 JCEF：真实加载 URL/HTML + eval 取回正文、sourceRegex onResourceLoad、JS 桥往返）连跑 3 次全绿；无 bundle 环境降级 [SKIP] 不失败；--jcef-probe 保留作 bundle 下载+最小验证入口",
+    "blockedBy": [],
+    "nextAfterThis": "Compose Multiplatform 前端（T7.6 骨架 → T7.7 书架/书源/阅读 → T7.8 前端 WebView 集成 + Part7 联测），见 PLAN.md 第 7.5 节"
   },
   "parts": [
     {
@@ -118,7 +119,7 @@
       "id": 7,
       "name": "WebView 兼容（引擎层）+ Compose Multiplatform 前端",
       "status": "in_progress",
-      "note": "T7.1~T7.5 引擎层纯代码完成（JCEF 直连选型取代已废弃的 KCEF；--webview-smoke-test 11 项断言 [PASS]）；T7.0 JCEF 接入与 offscreen 真实验证、T7.6~T7.8 Compose 前端待做；冒烟输出统一 ASCII [PASS]/[FAIL]/[SKIP]（教训28）"
+      "note": "T7.0~T7.5 引擎层全部完成（JCEF 直连取代已废弃 KCEF；--webview-smoke-test 15 项断言 [PASS] 连跑 3 次全绿，含 4 项真实 JCEF；无 bundle 降级 [SKIP]）；T7.6~T7.8 Compose 前端待做；冒烟输出统一 ASCII [PASS]/[FAIL]/[SKIP]（教训28）"
     }
   ],
   "tasks": [
@@ -366,10 +367,10 @@
       "id": "T7.0",
       "name": "JCEF 接入与 offscreen 最小加载验证",
       "part": 7,
-      "status": "pending",
-      "test": "最小程序能 offscreen 加载 HTML 并 executeJavaScript 取回结果（真实浏览器验证，需下载 Chromium bundle）",
-      "testedAt": "",
-      "note": "原规划 KCEF 已于 2025-10-28 归档废弃（维护者明示不推荐），compose-webview 又依赖 Compose UI 与已归档 KCEF；用户拍板改 JCEF 直连 + backend 直接引入。本任务需真实环境验证（下载 jcef bundle ~100-200MB + 配置 DesktopWebViewFactory.creator + 追加 --webview-smoke-test 真实浏览器断言），不能编造"
+      "status": "done",
+      "test": "--jcef-probe + --webview-smoke-test 真实段：offscreen 隐藏窗口加载 HTML + executeJavaScript 取回结果（'real-jcef-hello'/'inline-js-hello'）+ sourceRegex onResourceLoad + JS 桥往返；连跑 3 次全绿",
+      "testedAt": "2026-08-11",
+      "note": "选型：JCEF 直连（me.friwi:jcefmaven:146.0.10）+ backend 直接引入；非 OSR + 隐藏 AWT Frame（OSR/JOGL 无 GL 表面不推进 load，弃用）；CefEnv 全局初始化 + JcefDesktopWebView 实现 DesktopWebView（CefMessageRouter cefQuery 做 JS 往返、window.<name> Proxy 做 JS 桥、_memData 同步 getFromMemory）；导航竞态修复（readyForNav+isLoading 挂起）；bundle ~350MB 首次运行下载，LEGADO_DESKTOP_ENABLE_JCEF=1 启用；无 bundle 时冒烟 [SKIP] 降级；--jcef-probe 保留作下载+最小验证入口"
     },
     {
       "id": "T7.1",
@@ -403,18 +404,18 @@
       "name": "BackstageWebView 桌面版",
       "part": 7,
       "status": "done",
-      "test": "--webview-smoke-test T7.4 4 项断言（html+js 返回 JS 结果 / sourceRegex 资源匹配 / overrideUrlRegex 跳转拦截 / 超时 TimeoutCancellationException）",
+      "test": "--webview-smoke-test T7.4 4 项断言（html+js 返回 JS 结果 / sourceRegex 资源匹配 / overrideUrlRegex 跳转拦截 / 超时 TimeoutCancellationException）+ T7.0 真实段（真实加载 URL/HTML + eval + sourceRegex onResourceLoad）",
       "testedAt": "2026-08-11",
-      "note": "编排逻辑逐字保留（getStrResponse 超时+取消/retry 重试/redirect buildStrResponse）；WebViewClient/WebChromeClient→DesktopWebView 回调；Handler→DesktopHandler；setCookie 用桌面 CookieStore；真实浏览器段待 T7.0"
+      "note": "编排逻辑逐字保留（getStrResponse 超时+取消/retry 重试/redirect buildStrResponse）；WebViewClient/WebChromeClient→DesktopWebView 回调；Handler→DesktopHandler；setCookie 用桌面 CookieStore；真实浏览器段 T7.0 完成"
     },
     {
       "id": "T7.5",
       "name": "解除调用点裁剪",
       "part": 7,
       "status": "done",
-      "test": "compileKotlin 0 错误；--webview-smoke-test 全过",
+      "test": "compileKotlin 0 错误；--webview-smoke-test 全过（含真实 JCEF 段：BackstageWebView 真实加载 URL/HTML + eval）",
       "testedAt": "2026-08-11",
-      "note": "AnalyzeRule.getWebJsResult（webJs）、AnalyzeUrl.executeStrRequest useWebView 分支（if(false)→原版条件）、JsExtensions.webView/webViewGetSource/webViewGetOverrideUrl 全部恢复原版逻辑；实际执行需 JCEF 接入（T7.0）"
+      "note": "AnalyzeRule.getWebJsResult（webJs）、AnalyzeUrl.executeStrRequest useWebView 分支（if(false)→原版条件）、JsExtensions.webView/webViewGetSource/webViewGetOverrideUrl 全部恢复原版逻辑；真实执行经 JCEF 验证（T7.0）"
     },
     {
       "id": "T7.6",
@@ -498,6 +499,12 @@
       "task": "T7.0~T7.5 (Part 7 引擎层)",
       "result": "pass",
       "detail": "Part 7 引擎层 WebView 兼容纯代码完成：T7.0 调研发现原规划 KCEF 已归档废弃（2025-10-28，维护者明示不推荐）+ compose-webview 依赖 Compose UI 与已归档 KCEF → 用户拍板 JCEF 直连 + backend 直接引入 + 真实浏览器验证后置；T7.1 WebViewRequestConfig/PooledWebView 逐字 + DesktopWebView 抽象（JCEF 接缝）；T7.2 WebViewPool 逻辑逐字（acquire/startCleanupTimer diff IDENTICAL）+ DesktopWebViewFactory/resetForTest 接缝；T7.3 WebJsExtensions request 分发逐字（diff IDENTICAL）+ 桌面 RssJsExtensions 基类 + JS_INJECTION 逐字；T7.4 BackstageWebView 编排（getStrResponse/handleResult/buildStrResponse/正则拦截 逐字，仅 runOnUI→DesktopHandler、WebViewClient→回调、webkit Cookie→CookieStore）；T7.5 解除 AnalyzeRule/AnalyzeUrl/JsExtensions 三个裁剪点；--webview-smoke-test 11 项断言 [PASS] + JCEF 真实浏览器段 [SKIP] 后置；教训28：禁用 emoji（Windows GBK 控制台乱码 + grep 断言失效），7 个冒烟测试 + test_backend.sh 全部改 ASCII [PASS]/[FAIL]/[SKIP]"
+    },
+    {
+      "at": "2026-08-11T22:30:00+08:00",
+      "task": "T7.0 (Part 7 JCEF 接入)",
+      "result": "pass",
+      "detail": "T7.0 JCEF 落地完成：引入 me.friwi:jcefmaven:146.0.10（jcef-api+jogl）；探针验证 OSR(JOGL) 无 GL 表面不推进 load → 改非 OSR + 隐藏 AWT Frame（1x1 屏幕外，EDT 驱动）；CefEnv 全局初始化 + JcefDesktopWebView 实现（loadURL[header]/loadHtml[data:]/evaluateJavascript[__legadoEval+cefQuery 往返，结果 JSON 风格对齐 Android]/onBeforeBrowse/onResourceLoad[getResourceRequestHandler]/console/onCertificateError→Continue/JS 桥 window.<name> Proxy 反射 + _memData 同步 getFromMemory）；导航竞态修复（readyForNav+isLoading 挂起，加载中 loadURL 被丢弃）；CefWebView.init 接线 DesktopWebViewFactory.creator（LEGADO_DESKTOP_ENABLE_JCEF=1 启用）；bundle ~350MB 首次下载到 <home>/jcef-bundle；--webview-smoke-test 15 项断言（11 纯逻辑 + 4 真实 JCEF：真实加载 URL/HTML+eval 取回、sourceRegex onResourceLoad、JS 桥往返）连跑 3 次全绿；无 bundle 环境 [SKIP] 降级；--jcef-probe 保留；教训35/36"
     }
   ]
 }

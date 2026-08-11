@@ -1,6 +1,6 @@
 # WebView 兼容功能 + Compose Multiplatform 前端 规划
 
-> 状态：**2026-08-11 引擎层 T7.1~T7.5 完成**；T7.0 选型已改 JCEF 直连（原 KCEF 归档废弃），真实浏览器验证后置
+> 状态：**2026-08-11 引擎层 T7.0~T7.5 全部完成**（JCEF 直连，--webview-smoke-test 15 断言连跑 3 次全绿）
 > 关联：PLAN.md（Part 7）、ARCHITECTURE.md（前端解耦原则）、STATUS.json
 > 原则不变：忠于原版业务逻辑（Android→桌面等价替换）；跨平台（Windows/macOS/Linux）
 
@@ -77,17 +77,17 @@ legado-desktop/
 
 ## 5. 任务分解（Part 7，预计顺序）
 
-| Task | 内容 | 验收 |
-|---|---|---|
-| T7.0 | 调研落地：确定 WebView 库版本组合（compose-webview 2.0.3 vs Compose 1.11.x 兼容矩阵；或退 KCEF 直连）；`backend` 引入 KCEF 依赖跑通 offscreen 最小加载 | 最小程序能 offscreen 加载 HTML 并 executeJavaScript 取回结果 |
-| T7.1 | `WebViewRequestConfig` + `PooledWebView` 等价迁移（0 逻辑改动） | diff ≈ 0 |
-| T7.2 | `WebViewPool` 桌面版（KCEF browser 复用池 + 清理协程） | 池容量/复用/超时清理冒烟 |
-| T7.3 | `WebCacheManager` 接入已迁移 CacheManager + `WebJsExtensions` JS 桥（注入协议 + request 分发逐字保留） | JS 里 `window.legado.request('getStringAwait', ...)` 往返成功 |
-| T7.4 | `BackstageWebView` 桌面版（无头加载 + sourceRegex + overrideUrlRegex + delayTime + timeout + cacheFirst） | 与 Android 版同参数同行为；`--webview-smoke-test` |
-| T7.5 | 解除调用点裁剪：`AnalyzeRule.getWebJsResult`（@webjs:）、`AnalyzeUrl` useWebView 分支、`JsExtensions.webView/webViewGetSource/webViewGetOverrideUrl` | 原有规则/书源跑通（对照原版逻辑逐字恢复） |
-| T7.6 | Compose MP 工程骨架（`composeApp` KMP + desktopMain），最小窗口 + 后端 health 状态显示 | `./gradlew :composeApp:run` 出窗口，调通 backend API |
-| T7.7 | Compose 前端：书架/书源管理/阅读页（走 API.md） | 端到端：导入书源→搜索→阅读→进度 |
-| T7.8 | 前端 WebView 集成（登录/网页书源）+ Part 7 联测 | 网页登录走通；`tools/test_backend.sh` 增加 webview 段全绿 |
+| Task | 内容 | 验收 | 状态 |
+|---|---|---|---|
+| T7.0 | JCEF 直连落地：`me.friwi:jcefmaven:146.0.10` + CefEnv/CefWebView/JcefDesktopWebView（隐藏窗口承载，非 OSR） | `--jcef-probe` + `--webview-smoke-test` 真实段（加载 + executeJavaScript 取回 + JS 桥）全绿 | ✅ done |
+| T7.1 | `WebViewRequestConfig` + `PooledWebView` 等价迁移（0 逻辑改动） | diff ≈ 0 | ✅ done |
+| T7.2 | `WebViewPool` 桌面版（浏览器复用池 + 清理协程） | 池容量/复用/超时清理冒烟 | ✅ done |
+| T7.3 | `WebCacheManager` 接入已迁移 CacheManager + `WebJsExtensions` JS 桥（注入协议 + request 分发逐字保留） | JS 里 request 往返成功（Fake + 真实 JS 桥段） | ✅ done |
+| T7.4 | `BackstageWebView` 桌面版（无头加载 + sourceRegex + overrideUrlRegex + delayTime + timeout + cacheFirst） | 与 Android 版同参数同行为；`--webview-smoke-test`（真实段含加载/eval/sourceRegex） | ✅ done |
+| T7.5 | 解除调用点裁剪：`AnalyzeRule.getWebJsResult`（@webjs:）、`AnalyzeUrl` useWebView 分支、`JsExtensions.webView/webViewGetSource/webViewGetOverrideUrl` | 原有规则/书源跑通（对照原版逻辑逐字恢复） | ✅ done |
+| T7.6 | Compose MP 工程骨架（`composeApp` KMP + desktopMain），最小窗口 + 后端 health 状态显示 | `./gradlew :composeApp:run` 出窗口，调通 backend API | ⬜ 待做 |
+| T7.7 | Compose 前端：书架/书源管理/阅读页（走 API.md） | 端到端：导入书源→搜索→阅读→进度 | ⬜ 待做 |
+| T7.8 | 前端 WebView 集成（登录/网页书源）+ Part 7 联测 | 网页登录走通；`tools/test_backend.sh` 增加 webview 段全绿 | ⬜ 待做 |
 
 ## 6. 风险与对策
 
@@ -105,7 +105,8 @@ legado-desktop/
 1. ~~WebView 库选型：KCEF（compose-webview-multiplatform）优先~~ → **2026-08-11 修订：JCEF 直连**。
    KCEF（DatL4g）已于 2025-10-28 归档、维护者明示不推荐；compose-webview-multiplatform 是 Compose UI
    组件（需 composable 渲染，与"引擎层不依赖 Compose UI"冲突）且其桌面底层正是已归档 KCEF。
-   引擎层改 **JCEF 直连 + backend 直接引入**（T7.0 需下载 jcef bundle ~100-200MB 并做 offscreen 真实验证）。
+   引擎层改 **JCEF 直连 + backend 直接引入**（`me.friwi:jcefmaven:146.0.10`，bundle ~350MB 首次运行下载；
+   **已完成 T7.0 落地与真实验证**，见 HANDOVER 14）。
 2. **前端范围**：**最小可用**（书架/书源/阅读核心闭环），后续逐步完善
 3. **实施顺序**：**分两步走** —— 先引擎层（T7.1~T7.5，已完成），再做前端（T7.6~T7.8）
 4. **Compose 版本**：**稳定版**（1.11.x，不用 beta）

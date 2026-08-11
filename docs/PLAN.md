@@ -2,6 +2,7 @@
 
 > 配套状态追踪：`../STATUS.json`（每轮必须同步更新）
 > 原则：改错不改逻辑（Android→JVM 等价替换）；跨平台（Linux/macOS/Windows）；每 Task 测、每 Part 联测
+> **未完成移植项（全量复核发现，不在 Part 0~7 规划内）见 `../docs/GAPS.md`**
 
 ## 0. 技术栈与架构
 
@@ -129,16 +130,16 @@ Part 0 基础与构建（✅ DONE）
 ## 7.5 Part 7 WebView 兼容 + Compose Multiplatform 前端
 
 > 详细方案（调研结论/方案对比/任务分解/风险）：**`docs/WEBVIEW-COMPOSE-PLAN.md`**
-> 状态：**2026-08-11 引擎层 T7.1~T7.5 完成**；T7.0 选型已改为 **JCEF 直连**（原 KCEF 2025-10-28 归档废弃，见 HANDOVER 13.1），真实浏览器验证后置
+> 状态：**2026-08-11 引擎层 T7.0~T7.5 全部完成**；选型为 **JCEF 直连**（原 KCEF 2025-10-28 归档废弃，见 HANDOVER 13.1）
 
 | Task | 内容 | 验收 | 状态 |
 |---|---|---|---|
-| T7.0 | JCEF 直连落地：backend 引入 JCEF 依赖（jcefmaven 坐标核实）+ DesktopWebViewFactory.creator 接 JCEF 实现 | offscreen 最小加载 + executeJavaScript 取回结果（真实浏览器，需下载 bundle） | ⬜ 待做 |
+| T7.0 | JCEF 直连落地：backend 引入 JCEF 依赖（me.friwi:jcefmaven:146.0.10）+ CefEnv/CefWebView/JcefDesktopWebView | --jcef-probe + --webview-smoke-test 真实段（隐藏窗口加载 + executeJavaScript 取回 + JS 桥）全绿 | ✅ done |
 | T7.1 | WebViewRequestConfig + PooledWebView 等价迁移 + DesktopWebView 抽象 | diff ≈ 0 | ✅ done |
 | T7.2 | WebViewPool 桌面版（浏览器复用池 + 清理协程） | 池容量/复用/超时清理冒烟 | ✅ done |
-| T7.3 | WebCacheManager（已随 CacheManager 迁）+ WebJsExtensions JS 桥（request 分发逐字保留） | JS 里 request 往返成功（Fake 段已验，真实段待 T7.0） | ✅ done |
-| T7.4 | BackstageWebView 桌面版（无头加载 + sourceRegex + overrideUrlRegex + delayTime + timeout + cacheFirst） | 编排逻辑 Fake 冒烟 4 项已过；真实浏览器段待 T7.0 | ✅ done |
-| T7.5 | 解除调用点裁剪（AnalyzeRule webJs / AnalyzeUrl useWebView / JsExtensions.webView*） | 原书源跑通（待 JCEF 接入后真实验证） | ✅ done |
+| T7.3 | WebCacheManager（已随 CacheManager 迁）+ WebJsExtensions JS 桥（request 分发逐字保留） | JS 里 request 往返成功（Fake + 真实 JS 桥段） | ✅ done |
+| T7.4 | BackstageWebView 桌面版（无头加载 + sourceRegex + overrideUrlRegex + delayTime + timeout + cacheFirst） | Fake 编排 4 项 + 真实加载/eval/sourceRegex 全过 | ✅ done |
+| T7.5 | 解除调用点裁剪（AnalyzeRule webJs / AnalyzeUrl useWebView / JsExtensions.webView*） | 原书源跑通（真实 JCEF 验证） | ✅ done |
 | T7.6 | Compose MP 工程骨架（composeApp KMP + desktopMain） | run 出窗口 + 调通 backend API | ⬜ 待做 |
 | T7.7 | Compose 前端（书架/书源/阅读，走 API.md） | 端到端阅读闭环 | ⬜ 待做 |
 | T7.8 | 前端 WebView 集成 + Part 7 联测 | 网页登录走通；test_backend.sh 全绿 | ⬜ 待做 |

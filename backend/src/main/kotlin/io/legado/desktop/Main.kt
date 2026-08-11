@@ -101,6 +101,22 @@ fun main(args: Array<String>) {
         exitProcess(if (fails == 0) 0 else 1)
     }
 
+    // 1.13 T7.0 JCEF 最小探针（offscreen 加载 + executeJavaScript 取回结果）：跑完即退出
+    if (args.contains("--jcef-probe")) {
+        println("== T7.0 JCEF probe ==")
+        val bundleDir = java.io.File(DesktopEnv.homeDir.toFile(), "jcef-bundle")
+        val code = JcefProbe.run(bundleDir)
+        println("== T7.0 JCEF probe result: ${if (code == 0) "PASS" else "FAIL($code)"} ==")
+        exitProcess(code)
+    }
+
+    // 1.14 WebView 引擎可选启用：LEGADO_DESKTOP_ENABLE_JCEF=1 → 接线 JCEF（webJs/@webjs: 书源可用）
+    if (System.getenv("LEGADO_DESKTOP_ENABLE_JCEF") == "1") {
+        println("[legado-desktop] enabling JCEF webview engine ...")
+        io.legado.desktop.help.webView.CefWebView.init()
+        println("[legado-desktop] JCEF webview engine ready")
+    }
+
     // 2+3. HTTP/WS 服务
     val server = HttpServer(port)
     val wsServer = WebSocketServer(port + 1)

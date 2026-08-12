@@ -61,20 +61,24 @@ backend/
   build.gradle.kts        # 依赖与构建
   third_party/            # legado fork 的 htmlunit-core-js（Maven Central 无此版本）
   src/main/kotlin/io/legado/desktop/
-    Main.kt               # 入口：启动/关闭服务 + --dao/--net/--rule-smoke-test
+    Main.kt               # 入口：启动/关闭服务 + --dao/--net/--rule/--source/--api/--local/--webview-smoke-test
     env/                  # 桌面环境抽象（替代原 Android Context/appCtx）
     data/                 # SQLite DAO 层（移植自 Room DAO）
     model/                # 引擎（analyzeRule / jsSource / webBook 等）
     api/                  # HTTP/WebSocket 控制器
-composeApp/               # 规划中：Compose Multiplatform 桌面前端（Part 7）
+    help/webView/         # WebView 兼容层（DesktopWebView 抽象 + JCEF 实现 CefEnv/CefWebView/JcefDesktopWebView）
+composeApp/                # Compose Multiplatform 前端（Windows/macOS/Linux，最小原型已实现）
+  src/commonMain/          # UI（连接/书架/书源/阅读）+ 数据模型 + expect ApiClient
+  src/desktopMain/         # java.net.http actual + application 入口
 docs/
   ARCHITECTURE.md         # 移植架构说明
   API.md                  # 前后端接口契约
   PLAN.md                 # 移植规划表（Part 0~7）
   HANDOVER.md             # 交接文档（经验与坑，会话必读）
   WEBVIEW-COMPOSE-PLAN.md # WebView 兼容 + Compose 前端详细规划
+  GAPS.md                 # 未完成移植项清单（全量复核发现）
 frontend/
-  README.md               # 前端说明（你自建）
+  README.md               # 前端说明（你自建；Compose 前端见 composeApp/）
 ```
 
 ## 移植状态
@@ -86,7 +90,7 @@ frontend/
 - [x] **书源与读书引擎（Part 4）**：SourceHelp / jsSource / WebBook
 - [x] **API 层（Part 5）**：HttpServer 全路由 + WebSocket 搜索/调试 + 书源/RSS/书籍/替换规则/HTTP 日志 API
 - [x] **本地书籍解析（Part 6）**：TXT/EPUB/MOBI/UMD + 封面/图片 + 备份导入
-- [ ] **WebView 兼容 + Compose Multiplatform 前端（Part 7）**：引擎层 T7.0~T7.5 完成（JCEF 直连，`--webview-smoke-test` 15 项断言含 4 项真实浏览器）；Compose 前端（T7.6~T7.8）待做
+- [ ] **WebView 兼容 + Compose Multiplatform 前端（Part 7）**：引擎层 T7.0~T7.5 完成（JCEF 直连，`--webview-smoke-test` 15 项断言含 4 项真实浏览器）+ 前端 T7.6 骨架与 T7.7 最小原型完成（composeApp/，连接→书架→阅读→书源）；T7.7 完善 + T7.8 前端 WebView 集成待做
 
 > 数据层细节：24 张实体表 + `book_sources_part` 视图（schema v99）；DAO 接口与 Legado 一致，
 > SQL 逐条对照原版 Room `@Query`；`--dao-smoke-test` 全量冒烟（24 DAO CRUD + flow +
@@ -110,19 +114,20 @@ frontend/
 > 备份导出→清库→恢复→数据一致、Legado 备份 fixture 导入）；vendored `me.ag2s.epublib/umdlib` +
 > `lib.mobi`（Android 专属面仅 Log/Base64/PFD/SparseArray 等，均等价替换）；也由 `tools/test_backend.sh` 集成。
 
-## Part 7：WebView 兼容 + Compose Multiplatform 前端（引擎层完成）
+## Part 7：WebView 兼容 + Compose Multiplatform 前端（引擎层完成，前端最小原型）
 
 恢复原版被裁剪的 WebView 能力（`BackstageWebView` 后台无头执行 JS、`@webjs:` 规则、
 `AnalyzeUrl.useWebView` 分支、`JsExtensions.webView*`），并用 Compose Multiplatform
 统一管理桌面前端（Windows/macOS/Linux，除 Android 外）。详细方案见
 `docs/WEBVIEW-COMPOSE-PLAN.md`。
 
-**已确认决策（2026-08-11 更新）**：
+**已确认决策（2026-08-12 更新）**：
 - WebView 库：**JCEF 直连**（`me.friwi:jcefmaven:146.0.10`；原规划 KCEF 已归档废弃）
 - 引擎层（T7.0~T7.5）：**已完成**——`--webview-smoke-test` 15 项断言（11 纯逻辑 + 4 真实 JCEF）连跑 3 次全绿；
   JCEF 隐藏窗口承载浏览器 + `__legadoEval`/cefQuery JS 往返 + JS 桥 Proxy 反射 + `_memData` 同步
-- 启用：环境变量 `LEGADO_DESKTOP_ENABLE_JCEF=1`（首次运行下载 Chromium bundle ~350MB 到 `<数据目录>/jcef-bundle`）
-- Compose 前端（T7.6~T7.8）待做
+- 前端（T7.6 骨架 + T7.7 最小原型）：**已完成**——`composeApp/` KMP 工程（Compose 1.11.x），
+  连接后端→书架→阅读→书源四页面，走 API.md；搜索/进度保存/书源导入与前端 WebView 集成（T7.8）待做
+- 启用后端 WebView：环境变量 `LEGADO_DESKTOP_ENABLE_JCEF=1`（首次运行下载 Chromium bundle ~350MB）
 - 网页登录：最小可用阶段不包含；过渡方案 = API 返回登录 URL → 系统浏览器登录 → 手动填 Cookie 到设置
 
 ## 明确不移植（初版禁用）

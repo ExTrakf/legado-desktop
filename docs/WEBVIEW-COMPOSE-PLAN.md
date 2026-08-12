@@ -1,6 +1,6 @@
 # WebView 兼容功能 + Compose Multiplatform 前端 规划
 
-> 状态：**2026-08-11 引擎层 T7.0~T7.5 全部完成**（JCEF 直连，--webview-smoke-test 15 断言连跑 3 次全绿）
+> 状态：**2026-08-12 引擎层 T7.0~T7.5 全部完成 + 前端 T7.6 骨架完成、T7.7 最小原型完成**（JCEF 直连，--webview-smoke-test 15 断言连跑 3 次全绿）
 > 关联：PLAN.md（Part 7）、ARCHITECTURE.md（前端解耦原则）、STATUS.json
 > 原则不变：忠于原版业务逻辑（Android→桌面等价替换）；跨平台（Windows/macOS/Linux）
 
@@ -85,8 +85,8 @@ legado-desktop/
 | T7.3 | `WebCacheManager` 接入已迁移 CacheManager + `WebJsExtensions` JS 桥（注入协议 + request 分发逐字保留） | JS 里 request 往返成功（Fake + 真实 JS 桥段） | ✅ done |
 | T7.4 | `BackstageWebView` 桌面版（无头加载 + sourceRegex + overrideUrlRegex + delayTime + timeout + cacheFirst） | 与 Android 版同参数同行为；`--webview-smoke-test`（真实段含加载/eval/sourceRegex） | ✅ done |
 | T7.5 | 解除调用点裁剪：`AnalyzeRule.getWebJsResult`（@webjs:）、`AnalyzeUrl` useWebView 分支、`JsExtensions.webView/webViewGetSource/webViewGetOverrideUrl` | 原有规则/书源跑通（对照原版逻辑逐字恢复） | ✅ done |
-| T7.6 | Compose MP 工程骨架（`composeApp` KMP + desktopMain），最小窗口 + 后端 health 状态显示 | `./gradlew :composeApp:run` 出窗口，调通 backend API | ⬜ 待做 |
-| T7.7 | Compose 前端：书架/书源管理/阅读页（走 API.md） | 端到端：导入书源→搜索→阅读→进度 | ⬜ 待做 |
+| T7.6 | Compose MP 工程骨架（`composeApp` KMP + desktopMain），最小窗口 + 后端 health 状态显示 | `./gradlew :composeApp:run` 出窗口，调通 backend API | ✅ done |
+| T7.7 | Compose 前端：书架/书源管理/阅读页（走 API.md） | 最小原型（连接→书架→阅读→书源）已验证；搜索/进度保存/书源导入待完善 | 🚧 最小原型完成 |
 | T7.8 | 前端 WebView 集成（登录/网页书源）+ Part 7 联测 | 网页登录走通；`tools/test_backend.sh` 增加 webview 段全绿 | ⬜ 待做 |
 
 ## 6. 风险与对策

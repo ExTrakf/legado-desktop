@@ -65,15 +65,16 @@
     "教训36：JCEF 桥/事件有竞态——浏览器创建后立即 loadURL 会被丢弃（初始 about:blank 或池复位 about:blank 加载中）；用 readyForNav（首个空闲态）+ isLoading 判定挂起导航，避免重复下载/丢弃；测试断言 URL 拼接注意 pageUrl 以 '/' 结尾（pageUrl+path 会出现双斜杠）",
     "教训37：全量编译测试发现 3 处 Windows 跨平台字符集 bug（原版在 Android/Linux 恒 UTF-8，Windows 默认 GBK）：①GsonExtensions.fromJsonObject/fromJsonArray(InputStream) 用 InputStreamReader(inputStream) 未指定字符集 → 备份恢复 mojibake（书源/规则名乱码）；②EpubFile.mCharset = Charset.defaultCharset() → EPUB 正文乱码。均改为显式 UTF-8（对齐 Android 语义，也符合教训28 非 UTF-8 禁令）",
     "教训38：SqlExecutor.execute 多行 vararg 展平 bug——DAO 把 k 行参数 flatMap 展平传入单行 SQL，bind() 只消耗占位符数量的参数 → 只写第一行，后续行静默丢失（Restore 备份 2+ 书/源只恢复第一条；local 冒烟只断言第一本'斗破苍穹'掩盖了 bug）。修复：execute() 检测 args.size > 占位符数 → 按单行参数数 chunked 走 executeBatch（对齐 Room @Insert(vararg) 语义）；executeBatch 返回受影响行数。另 ServerDaoImpl.insert 空 vararg 触发全 NULL INSERT 致 NOT NULL 失败（round-trip 备份恒写空 servers.json），已加空列表 no-op（Room 语义）",
-    "教训39：全量编译测试（2026-08-12）：clean build installDist 通过 + 7 个冒烟（dao25/net16/rule23/src18/api29/local11/webview15=137 断言）全绿 + 服务级 health/CORS/404/25表+视图校验通过"
+    "教训39：全量编译测试（2026-08-12）：clean build installDist 通过 + 7 个冒烟（dao25/net16/rule23/src18/api29/local11/webview15=137 断言）全绿 + 服务级 health/CORS/404/25表+视图校验通过",
+    "教训40：Compose Multiplatform 前端最小原型（2026-08-12）——composeApp/ KMP 工程（Kotlin 2.4.10 + org.jetbrains.compose 1.11.1 + kotlin.plugin.compose 2.4.10 + kotlinx-serialization-json 1.8.0，只启用 jvm(desktop) target）；commonMain 放 UI/数据模型（@Serializable + Json ignoreUnknownKeys + 纯 Kotlin urlEncode，**不能用 java.net.URLEncoder 等 JVM API**），desktopMain 用 java.net.http 实现 expect ApiClient + main()（application+Window）；四页面 Connect（health）→ Bookshelf（/getBookshelf）→ Read（/getChapterList + /getBookContent 双栏）+ Sources（/getBookSources）；连接后端→进入书架→阅读 已验证无报错；T7.7 搜索/进度保存/书源导入等留待完善"
   ],
   "current": {
     "part": 7,
-    "task": "T7.0~T7.5 引擎层 WebView 兼容全部完成（JCEF 直连 + 真实浏览器验证通过）",
-    "taskStatus": "done",
-    "whatImDoing": "Part 7 引擎层完成：T7.0 JCEF 落地——me.friwi:jcefmaven:146.0.10 + CefEnv（非 OSR + 隐藏 AWT Frame，EDT 驱动）+ JcefDesktopWebView（loadURL/loadHtml[data:]/evaluateJavascript[__legadoEval+cefQuery 往返]/onBeforeBrowse/onResourceLoad/console/SSL proceed/JS 桥 Proxy 反射 + _memData 同步）+ DesktopWebViewFactory.creator 接线（CefWebView.init，LEGADO_DESKTOP_ENABLE_JCEF=1 启用）；导航竞态修复（readyForNav+isLoading 挂起）；--webview-smoke-test 15 项断言（11 纯逻辑 + 4 真实 JCEF：真实加载 URL/HTML + eval 取回正文、sourceRegex onResourceLoad、JS 桥往返）连跑 3 次全绿；无 bundle 环境降级 [SKIP] 不失败；--jcef-probe 保留作 bundle 下载+最小验证入口",
+    "task": "T7.6 骨架完成 + T7.7 前端最小原型（连接/书架/书源/阅读）",
+    "taskStatus": "in_progress",
+    "whatImDoing": "Compose Multiplatform 前端最小原型：composeApp/ KMP 工程（Kotlin 2.4.10 + Compose 1.11.1 + kotlinx-serialization，jvm(desktop)）；commonMain UI+模型（@Serializable/Json/纯 Kotlin urlEncode），desktopMain java.net.http actual + application 入口；Connect（/api/health）→ Bookshelf（/getBookshelf）→ Read（/getChapterList+/getBookContent 双栏）→ Sources（/getBookSources）；已手动验证：连接后端→进入书架→阅读，无报错；T7.7 剩余（搜索/进度保存/书源导入）与 T7.8（前端 WebView 集成）待做",
     "blockedBy": [],
-    "nextAfterThis": "Compose Multiplatform 前端（T7.6 骨架 → T7.7 书架/书源/阅读 → T7.8 前端 WebView 集成 + Part7 联测），见 PLAN.md 第 7.5 节"
+    "nextAfterThis": "T7.7 完善（搜索页 / 阅读进度保存 / 书源导入管理）→ T7.8 前端 WebView 集成（登录/网页书源）+ Part7 联测"
   },
   "parts": [
     {
@@ -424,19 +425,19 @@
       "id": "T7.6",
       "name": "Compose MP 工程骨架",
       "part": 7,
-      "status": "pending",
-      "test": "./gradlew :composeApp:run 出窗口，调通 backend API",
-      "testedAt": "",
-      "note": ""
+      "status": "done",
+      "test": "compileKotlinDesktop + desktopJar 通过；gradlew run 出窗口 + 连接后端进入书架（手动验证）",
+      "testedAt": "2026-08-12",
+      "note": "composeApp/ KMP（jvm(desktop) target）：Kotlin 2.4.10 + org.jetbrains.compose 1.11.1 + kotlin.plugin.compose 2.4.10 + kotlinx-serialization-json 1.8.0；commonMain UI/模型/expect ApiClient，desktopMain java.net.http actual + application 入口"
     },
     {
       "id": "T7.7",
       "name": "Compose 前端（书架/书源/阅读）",
       "part": 7,
-      "status": "pending",
-      "test": "端到端：导入书源→搜索→阅读→进度",
-      "testedAt": "",
-      "note": ""
+      "status": "in_progress",
+      "test": "最小原型已过：连接(/api/health)→书架(/getBookshelf)→阅读(/getChapterList+/getBookContent)+书源(/getBookSources)，手动验证无报错",
+      "testedAt": "2026-08-12",
+      "note": "最小原型完成（Connect/Bookshelf/Read 双栏/Sources 四页）；剩余：搜索页、阅读进度保存、书源导入管理，见 docs/WEBVIEW-COMPOSE-PLAN.md"
     },
     {
       "id": "T7.8",
@@ -514,6 +515,12 @@
       "task": "全量编译测试 + 跨平台 bug 修复",
       "result": "pass",
       "detail": "全量编译测试：clean build installDist 通过 + 7 个冒烟 137 断言全绿（dao25/net16/rule23/src18/api29/local11/webview15）+ 服务级校验（health/CORS/404 JSON/25表+视图）；发现并修复 3 处 Windows 跨平台 bug：①GsonExtensions InputStream 字符集（GBK→UTF-8，备份恢复 mojibake）；②EpubFile mCharset（defaultCharset→UTF-8，EPUB 正文乱码）；③SqlExecutor 多行 vararg 展平只插第一行（args>占位符 → chunked 走 executeBatch，对齐 Room @Insert(vararg)）+ ServerDaoImpl 空 vararg 全 NULL INSERT（空列表 no-op）；教训37/38/39"
+    },
+    {
+      "at": "2026-08-12T15:00:00+08:00",
+      "task": "T7.6~T7.7 最小原型 (Compose Multiplatform 前端)",
+      "result": "pass",
+      "detail": "Compose Multiplatform 前端最小原型：composeApp/ KMP 工程（Kotlin 2.4.10 + Compose 1.11.1 + kotlinx-serialization 1.8.0，jvm(desktop)）；commonMain UI+@Serializable 模型+expect ApiClient+纯 Kotlin urlEncode，desktopMain java.net.http actual + application 入口；Connect(/api/health)→Bookshelf(/getBookshelf)→Read(/getChapterList+/getBookContent 双栏)→Sources(/getBookSources)；compileKotlinDesktop+desktopJar 通过；手动验证连接后端→进入书架→阅读无报错；教训40"
     }
   ]
 }

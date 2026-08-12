@@ -509,3 +509,36 @@
 - STATUS.json 已同步（lessons 追加 37~39）
 - remote main 最新：本会话提交后更新
 - 下一步：**Compose Multiplatform 前端**（T7.6 骨架 → T7.7 书架/书源/阅读 → T7.8 前端 WebView 集成 + Part7 联测），见 PLAN.md 第 7.5 节
+
+## 16. Part 7 Compose Multiplatform 前端最小原型会话经验（2026-08-12，交接给下一会话）
+
+> 本会话从「composeApp Gradle 骨架 → commonMain UI/模型 → desktopMain actual → 编译 → 手动验证」全程完成。
+> **结论：T7.6 骨架完成 + T7.7 最小原型（连接→书架→阅读→书源）可用；搜索/进度保存/书源导入 + T7.8 前端 WebView 集成待做。**
+
+### 16.1 本轮完成
+- **`composeApp/` KMP 工程**：Kotlin 2.4.10 + `org.jetbrains.compose` 1.11.1 + `org.jetbrains.kotlin.plugin.compose` 2.4.10 + `kotlin("plugin.serialization")` 2.4.10 + kotlinx-serialization-json 1.8.0；只启用 `jvm("desktop")` target（KMP 结构预留）；wrapper 复用 backend 的 8.14.4；仓库配置含 aliyun 镜像
+- **commonMain**（`io/legado/desktop/app/`）：
+  - `Models.kt`：@Serializable 数据类（ReturnData/Book/BookSource/BookChapter）+ `parseData(raw, serializer)`/`parseDataRaw`（Json ignoreUnknownKeys，ReturnData.data 反序列化）
+  - `ApiClient.kt`：`expect class ApiClient(baseUrl)` + `suspend fun get(path): String`
+  - `App.kt`：App() 根 + `AppState`（screen/baseUrl/books/sources/chapters/content/error/loading，mutableState 驱动）+ Screen 枚举
+  - `Screens.kt`：Connect（baseUrl 输入 + /api/health 连接）/ Bookshelf（/getBookshelf 列表，点击进阅读）/ Read（目录 + 正文双栏）/ Sources（/getBookSources 列表）
+  - `UrlEncoding.kt`：纯 Kotlin 百分号编码（**commonMain 无 java.net.URLEncoder**）
+- **desktopMain**：`ApiClient.desktop.kt`（java.net.http.HttpClient + Dispatchers.IO actual）、`Main.kt`（application { Window { App() } }）
+- **验证**：compileKotlinDesktop + desktopJar 通过；`gradlew run` 出窗口；**手动验证：连接后端 → 进入书架 → 阅读无报错**
+
+### 16.2 本轮新踩的坑（别重踩）
+1. **commonMain 不能用 JVM API**：`java.net.URLEncoder` 在 commonMain 编译失败——URL 编码改用纯 Kotlin 实现（UrlEncoding.kt）。教训40。
+2. **Compose 版本组合**：Kotlin 2.4.10 需配套 `org.jetbrains.kotlin.plugin.compose` **同版本**（Kotlin 自带的 compose 编译器插件）；`org.jetbrains.compose` 1.11.1 是 runtime/DSL。三插件缺一不可。
+3. **kotlinx-serialization 泛型**：`parseData(raw, ListSerializer(Book.serializer()))` 需显式 serializer；ReturnData.data 是动态结构，按端点类型解析。
+4. **幂等清理**：跑完 GUI 进程要精确 kill（java + backend MainKt），勿留窗口进程。
+
+### 16.3 已验证有效的方法（照用）
+- **expect/actual**：commonMain 定义 `expect class ApiClient(baseUrl)`（含构造器），desktopMain `actual class` 用 java.net.http（send 阻塞 → Dispatchers.IO 包裹）。
+- **Json 解析**：`Json { ignoreUnknownKeys = true }` 容忍后端多余字段；isSuccess==false → 返回 null。
+- **UI 状态**：单 AppState 类 + mutableStateOf 属性，页面直接读写，最简导航（Screen 枚举 when 分发）。
+
+### 16.4 当前状态（2026-08-12 会话结束时）
+- Part 0/1/2/3/4/5/6 done + **Part 7 引擎层 T7.0~T7.5 done + 前端 T7.6 骨架 done + T7.7 最小原型 done**
+- STATUS.json 已同步（lessons 追加 40；T7.6 done、T7.7 in_progress[最小原型]）
+- remote main 最新：本会话提交后更新
+- 下一步：**T7.7 完善**（搜索页 / 阅读进度保存 / 书源导入管理）→ **T7.8 前端 WebView 集成**（登录/网页书源）+ Part7 联测，见 PLAN.md 第 7.5 节

@@ -25,6 +25,8 @@
 - [x] `GET/POST /getHttpLogs /getHttpLog` — HTTP 日志（令牌保护）
 - [x] `POST /saveReadConfig` `GET /getReadConfig` — Web 阅读配置
 - [x] `POST /saveJsSource` — JS 书源导入（text/plain + 令牌）
+- [x] `POST /restoreDefaultData` — 恢复默认数据（txtTocRule/dictRule/rssSource/httpTTS，可选 body {"types":[...]}）
+- [x] `POST /cacheBook` `POST /cacheBookStop` `POST /cacheBookRemove` — 缓存书籍（批量缓存章节正文）
 - [x] `WS /searchBook` — 多源搜索
 - [x] `WS /bookSourceDebug` `WS /rssSourceDebug` — 源调试
 

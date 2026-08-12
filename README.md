@@ -9,10 +9,9 @@
 
 ```
 ┌──────────────────────────────────────────────┐
-│  frontend/（你的前端，完全自由）               │
-│  - 可以是任何技术栈：Vue/React/Tauri/Electron  │
-│  - 规划中：composeApp/（Compose Multiplatform │
-│    桌面前端，Windows/macOS/Linux，见 Part 7）  │
+│  composeApp/（Compose Multiplatform 前端）    │
+│  - Windows/macOS/Linux 桌面前端（最小原型已实现）│
+│  - 连接→书架→阅读→书源，走 docs/API.md         │
 └──────────────┬───────────────────────────────┘
                │ HTTP (REST + JSON) / WebSocket
 ┌──────────────▼───────────────────────────────┐
@@ -22,7 +21,8 @@
 │  - OkHttp 网络层 + Cookie/代理                │
 │  - SQLite 数据层（schema 对齐 Legado v99）    │
 │  - NanoHTTPD HTTP 服务 + WebSocket            │
-│  - 本地书籍解析（TXT/EPUB/MOBI/UMD）          │
+│  - 本地书籍解析（TXT/EPUB/MOBI/UMD）+ 缓存/下载 │
+│  - WebView 兼容（JCEF）                       │
 └──────────────────────────────────────────────┘
 ```
 
@@ -90,7 +90,8 @@ frontend/
 - [x] **书源与读书引擎（Part 4）**：SourceHelp / jsSource / WebBook
 - [x] **API 层（Part 5）**：HttpServer 全路由 + WebSocket 搜索/调试 + 书源/RSS/书籍/替换规则/HTTP 日志 API
 - [x] **本地书籍解析（Part 6）**：TXT/EPUB/MOBI/UMD + 封面/图片 + 备份导入
-- [ ] **WebView 兼容 + Compose Multiplatform 前端（Part 7）**：引擎层 T7.0~T7.5 完成（JCEF 直连，`--webview-smoke-test` 15 项断言含 4 项真实浏览器）+ 前端 T7.6 骨架与 T7.7 最小原型完成（composeApp/，连接→书架→阅读→书源）；T7.7 完善 + T7.8 前端 WebView 集成待做
+- [x] **后端补全（GAPS.md 真缺口）**：默认数据导入（keyboardAssists seed + `/restoreDefaultData`）+ 缓存书籍（CacheBook）+ 下载（Download）+ rar/7z 解压
+- [ ] **Part 7**：引擎层 T7.0~T7.5 完成（JCEF 直连，`--webview-smoke-test` 15 项断言含 4 项真实浏览器，连跑 4 次全绿）+ 前端 T7.6 骨架与 T7.7 最小原型完成（composeApp/，连接→书架→阅读→书源）；T7.7 完善（搜索/进度保存/书源导入）+ T7.8 前端 WebView 集成待做
 
 > 数据层细节：24 张实体表 + `book_sources_part` 视图（schema v99）；DAO 接口与 Legado 一致，
 > SQL 逐条对照原版 Room `@Query`；`--dao-smoke-test` 全量冒烟（24 DAO CRUD + flow +
@@ -136,5 +137,6 @@ frontend/
 - 视频播放 / 弹幕（VideoPlay、gsyVideoPlayer）
 - Android UI / 通知 / 前台服务 / 广播 / 桌面部件 / ContentProvider
 - 应用内更新 / 崩溃统计（Firebase）
-- WebView 依赖功能：~~初版禁用~~ → **Part 7 规划中恢复**（KCEF 桌面等价实现；Android 专属
+- **AutoTask 定时任务引擎、WebDAV**（2026-08-12 用户拍板不做；数据层已迁）
+- WebView 依赖功能：~~初版禁用~~ → **Part 7 已恢复**（JCEF 桌面等价实现；Android 专属
   `addJavascriptInterface` 用 JS 注入 + `window.legadoJsBridgeResult` 回调等价替代）

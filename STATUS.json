@@ -16,7 +16,9 @@
       "Android UI / 通知 / 前台服务 / 广播 / 桌面部件 / ContentProvider",
       "WebView 登录 UI 渲染（ui/login/WebViewLoginFragment）、RSS 可见 WebView、webkit Cookie 同步（桌面纯 HTTP Cookie）",
       "应用更新 / 崩溃统计（Firebase / CrashHandler）",
-      "Glide 图片加载（改用 OkHttp + 文件读）"
+      "Glide 图片加载（改用 OkHttp + 文件读）",
+      "AutoTask 定时任务引擎（2026-08-12 用户拍板不做；数据层 DAO/实体/CronSchedule 已迁）",
+      "WebDAV（AppWebDav / lib/webdav / model/remote；2026-08-12 用户拍板不做；Server 数据/AES 已迁）"
     ],
     "blocking": [
       "编译未通过前不验收任何 task",
@@ -123,9 +125,9 @@
     },
     {
       "id": 7,
-      "name": "WebView 兼容（引擎层）+ Compose Multiplatform 前端",
+      "name": "WebView 兼容（引擎层）+ Compose Multiplatform 前端 + 后端补全",
       "status": "in_progress",
-      "note": "T7.0~T7.5 引擎层全部完成（JCEF 直连取代已废弃 KCEF；--webview-smoke-test 15 项断言 [PASS] 连跑 3 次全绿，含 4 项真实 JCEF；无 bundle 降级 [SKIP]）；T7.6~T7.8 Compose 前端待做；冒烟输出统一 ASCII [PASS]/[FAIL]/[SKIP]（教训28）"
+      "note": "引擎层 T7.0~T7.5 全部完成（JCEF 直连取代已废弃 KCEF；--webview-smoke-test 15 项断言含 4 项真实 JCEF，连跑 4 次全绿）；前端 T7.6 骨架完成 + T7.7 最小原型完成（composeApp/，连接→书架→阅读→书源）；后端补全完成（默认数据导入/CacheBook/Download/rar7z，见 GAPS.md）；AutoTask/WebDAV 用户拍板不做；T7.7 完善 + T7.8 前端 WebView 集成待做；冒烟输出统一 ASCII [PASS]/[FAIL]/[SKIP]（教训28）"
     }
   ],
   "tasks": [

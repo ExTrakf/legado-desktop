@@ -1,6 +1,10 @@
 package io.legado.desktop.web
 
 import fi.iki.elonen.NanoHTTPD
+import fi.iki.elonen.NanoHTTPD.DefaultTempFile
+import fi.iki.elonen.NanoHTTPD.TempFile
+import fi.iki.elonen.NanoHTTPD.TempFileManager
+import fi.iki.elonen.NanoHTTPD.TempFileManagerFactory
 import io.legado.desktop.api.ReturnData
 import io.legado.desktop.api.controller.BookController
 import io.legado.desktop.api.controller.BookSourceController
@@ -31,6 +35,32 @@ import java.io.ByteArrayInputStream
  * - WebService.serve()（Android 前台服务）无对应物，删除
  */
 class HttpServer(port: Int) : NanoHTTPD(port) {
+
+    /**
+     * Windows 上 NanoHTTPD 的 DefaultTempFileManager.clear() 删除临时文件时常因句柄未释放抛
+     * "could not delete temporary file" 告警（POST 解析写 body 到 %TEMP%/NanoHTTPD-*）。
+     * 换成容忍删除失败的 TempFileManager，消除噪音（不影响任何功能）。
+     */
+    init {
+        setTempFileManagerFactory(
+            TempFileManagerFactory {
+                object : TempFileManager {
+                    private val tempFiles = ArrayList<TempFile>()
+                    override fun createTempFile(filenameHint: String?): TempFile {
+                        val tempDir = java.io.File(System.getProperty("java.io.tmpdir"))
+                        val tempFile = DefaultTempFile(tempDir)
+                        tempFiles.add(tempFile)
+                        return tempFile
+                    }
+
+                    override fun clear() {
+                        tempFiles.forEach { runCatching { it.delete() } }
+                        tempFiles.clear()
+                    }
+                }
+            }
+        )
+    }
 
     override fun serve(session: IHTTPSession): Response {
         var returnData: ReturnData? = null

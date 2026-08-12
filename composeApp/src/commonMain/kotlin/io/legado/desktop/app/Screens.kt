@@ -581,7 +581,7 @@ fun SourceManageScreen(state: AppState, scope: CoroutineScope) {
                 value = sourceJson,
                 onValueChange = { sourceJson = it },
                 label = { Text("粘贴书源 JSON 或 JS 源码") },
-                modifier = Modifier.fillMaxWidth().weight(1f)
+                modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp, max = 320.dp)
             )
             state.sourceMessage?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp))
@@ -600,7 +600,7 @@ fun SourceManageScreen(state: AppState, scope: CoroutineScope) {
                 ) { Text("导入 JS 源") }
             }
             Text("当前书源（点击启停，删除用右侧按钮）", style = MaterialTheme.typography.titleSmall)
-            LazyColumn(Modifier.fillMaxSize()) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                 items(state.sources, key = { it.bookSourceUrl }) { s ->
                     Card(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

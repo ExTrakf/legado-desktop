@@ -39,13 +39,11 @@ cd backend
 ./gradlew run            # 启动后端，默认监听 http://127.0.0.1:2323
 ```
 
-跨平台启动脚本（自动 `installDist` 构建 + 参数透传，数据目录默认 `~/.legado-desktop`，可用 `LEGADO_DESKTOP_HOME` 覆盖）：
+跨平台启动脚本（Python 3.8+，单脚本 Windows/Linux/macOS 通用；自动 `installDist` 构建 + 参数透传，数据目录默认 `~/.legado-desktop`，可用 `LEGADO_DESKTOP_HOME` 覆盖）：
 
 ```bash
-# Linux/macOS/Git-Bash/WSL
-tools/start_backend.sh [--build] [--port 2323] [--set-js-source-token <token>] ...
-# Windows PowerShell
-powershell -ExecutionPolicy Bypass -File tools/start_backend.ps1 [-build] [-port 2323] ...
+# Windows / Linux / macOS / WSL 均可
+python tools/start_backend.py [--build] [--port 2323] [--set-js-source-token <token>] ...
 ```
 
 后端常见参数：`--port <n>`（默认 2323）、`--host <addr>`（默认 127.0.0.1）、`--set-js-source-token <token>`（设置 Web 书源令牌后退出）、`--api-smoke-test` 等冒烟入口。

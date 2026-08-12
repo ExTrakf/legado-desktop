@@ -43,6 +43,18 @@ compose.desktop {
             targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "LegadoDesktop"
             packageVersion = "0.1.0"
+            // 打包运行时 jlink 默认只含基础模块，必须显式补 java.net.http
+            // （前端 ApiClient/SearchClient 用 java.net.http.HttpClient / WebSocket，缺则 NoClassDefFoundError）
+            modules(
+                "java.base",
+                "java.datatransfer",
+                "java.xml",
+                "java.prefs",
+                "java.desktop",
+                "java.logging",
+                "jdk.crypto.ec",
+                "java.net.http",
+            )
         }
     }
 }

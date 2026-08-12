@@ -77,6 +77,7 @@ docs/
   HANDOVER.md             # 交接文档（经验与坑，会话必读）
   WEBVIEW-COMPOSE-PLAN.md # WebView 兼容 + Compose 前端详细规划
   GAPS.md                 # 未完成移植项清单（全量复核发现）
+  ROADMAP.md              # 剩余开发路线（前端完善 / WebView 集成 / 未移植后端边界）
 frontend/
   README.md               # 前端说明（你自建；Compose 前端见 composeApp/）
 ```

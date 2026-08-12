@@ -3,6 +3,7 @@
 > 配套状态追踪：`../STATUS.json`（每轮必须同步更新）
 > 原则：改错不改逻辑（Android→JVM 等价替换）；跨平台（Linux/macOS/Windows）；每 Task 测、每 Part 联测
 > **未完成移植项（全量复核发现，不在 Part 0~7 规划内）见 `../docs/GAPS.md`**
+> **剩余非后端开发（前端 T7.7 完善 / T7.8 WebView / 联测 / 未移植后端边界）见 `../docs/ROADMAP.md`**
 
 ## 0. 技术栈与架构
 

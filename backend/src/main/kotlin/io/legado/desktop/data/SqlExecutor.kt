@@ -17,6 +17,17 @@ object SqlExecutor {
     /** 执行写操作（insert/update/delete），返回影响行数 */
     fun Connection.execute(sql: String, args: List<Any?> = emptyList()): Int {
         val (prepared, bindArgs) = bind(sql, args)
+        // Room @Insert/Update(vararg) 语义：DAO 把多行参数展平传入（k 行 × 单行参数数）。
+        // 当 args 多于实际占位符数时为多行展平——按单行参数数切块批量执行（否则只写第一行，后续静默丢失）
+        if (args.size > bindArgs.size) {
+            val rowSize = bindArgs.size
+            if (rowSize <= 0 || args.size % rowSize != 0) {
+                throw IllegalStateException(
+                    "参数数量 ${args.size} 与占位符数 $rowSize 不匹配（多行展平应按行整数倍）"
+                )
+            }
+            return executeBatch(sql, args.chunked(rowSize))
+        }
         prepareStatement(prepared).use { st ->
             st.bindAll(bindArgs)
             return st.executeUpdate()
@@ -71,15 +82,15 @@ object SqlExecutor {
         }
     }
 
-    /** 批量执行（事务内调用） */
-    fun Connection.executeBatch(sql: String, batchArgs: List<List<Any?>>) {
+    /** 批量执行（事务内调用），返回受影响行数总和 */
+    fun Connection.executeBatch(sql: String, batchArgs: List<List<Any?>>): Int {
         val (prepared, _) = bind(sql, batchArgs.firstOrNull() ?: emptyList())
         prepareStatement(prepared).use { st ->
             batchArgs.forEach { args ->
                 st.bindAll(args)
                 st.addBatch()
             }
-            st.executeBatch()
+            return st.executeBatch().sum()
         }
     }
 

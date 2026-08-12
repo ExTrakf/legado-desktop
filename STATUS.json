@@ -62,7 +62,10 @@
     "教训33：桌面 evaluateJavascript 结果回调是 String?（Android ValueCallback 非空）——BackstageWebView.handleResult 用 it ?: \"null\" 保证空值走 retry 分支（语义等价）",
     "教训34：2026-08-11 全量复核完成——原版后端业务 518 文件 vs 桌面 347 文件；209 个缺失文件绝大多数为 Android UI 专属/明确不移植；真缺口 6 项（不在明确不移植清单）：AutoTask 定时任务引擎（model/AutoTask* 4 文件，仅 DAO/CronSchedule 已迁）、CacheBook 缓存书籍（model/CacheBook.kt）、Download 下载（model/Download.kt 抛错 stub，桌面无调用方）、WebDAV（help/AppWebDav + lib/webdav + model/remote，可选）、rar/7z 解压（utils/compress/LibArchiveUtils，桌面仅 zip）、默认数据导入（DefaultData.importDefault* 死代码 + keyboardAssists 建库不 seed）。完整清单与执行顺序见 docs/GAPS.md",
     "教训35：JCEF（jcefmaven me.friwi:jcefmaven:146.0.10）集成关键结论：①OSR 离屏模式（JOGL）无 GL 表面时 load 事件不推进，必须 windowless_rendering_enabled=false + 隐藏 AWT Frame（1x1 无装饰屏幕外）承载浏览器，由 EDT 驱动消息循环；②executeJavaScript/loadURL 必须从 CEF/EDT 线程调用，其它线程调用被静默丢弃（用 SwingUtilities.invokeLater 包装）；③浏览器加载中调用 loadURL 会被丢弃——导航需 readyForNav+isLoading 判定，未就绪/加载中挂起、onLoadingStateChange(false) 空闲时应用；④JS 往返用 CefMessageRouter（cefQuery），evaluateJavascript 经 __legadoEval helper eval 后结果 JSON 风格返回（对齐 Android）；⑤JS 桥用 window.<name> Proxy 经 cefQuery 反射回 Java，getFromMemory 同步语义用页面 _memData 对象实现；⑥bundle（Chromium natives ~350MB）首次运行下载；⑦此版本 CefRequestHandler 的 onBeforeResourceLoad 移到 getResourceRequestHandler 返回的 CefResourceRequestHandler，SSL 错误用 onCertificateError+callback.Continue()",
-    "教训36：JCEF 桥/事件有竞态——浏览器创建后立即 loadURL 会被丢弃（初始 about:blank 或池复位 about:blank 加载中）；用 readyForNav（首个空闲态）+ isLoading 判定挂起导航，避免重复下载/丢弃；测试断言 URL 拼接注意 pageUrl 以 '/' 结尾（pageUrl+path 会出现双斜杠）"
+    "教训36：JCEF 桥/事件有竞态——浏览器创建后立即 loadURL 会被丢弃（初始 about:blank 或池复位 about:blank 加载中）；用 readyForNav（首个空闲态）+ isLoading 判定挂起导航，避免重复下载/丢弃；测试断言 URL 拼接注意 pageUrl 以 '/' 结尾（pageUrl+path 会出现双斜杠）",
+    "教训37：全量编译测试发现 3 处 Windows 跨平台字符集 bug（原版在 Android/Linux 恒 UTF-8，Windows 默认 GBK）：①GsonExtensions.fromJsonObject/fromJsonArray(InputStream) 用 InputStreamReader(inputStream) 未指定字符集 → 备份恢复 mojibake（书源/规则名乱码）；②EpubFile.mCharset = Charset.defaultCharset() → EPUB 正文乱码。均改为显式 UTF-8（对齐 Android 语义，也符合教训28 非 UTF-8 禁令）",
+    "教训38：SqlExecutor.execute 多行 vararg 展平 bug——DAO 把 k 行参数 flatMap 展平传入单行 SQL，bind() 只消耗占位符数量的参数 → 只写第一行，后续行静默丢失（Restore 备份 2+ 书/源只恢复第一条；local 冒烟只断言第一本'斗破苍穹'掩盖了 bug）。修复：execute() 检测 args.size > 占位符数 → 按单行参数数 chunked 走 executeBatch（对齐 Room @Insert(vararg) 语义）；executeBatch 返回受影响行数。另 ServerDaoImpl.insert 空 vararg 触发全 NULL INSERT 致 NOT NULL 失败（round-trip 备份恒写空 servers.json），已加空列表 no-op（Room 语义）",
+    "教训39：全量编译测试（2026-08-12）：clean build installDist 通过 + 7 个冒烟（dao25/net16/rule23/src18/api29/local11/webview15=137 断言）全绿 + 服务级 health/CORS/404/25表+视图校验通过"
   ],
   "current": {
     "part": 7,
@@ -505,6 +508,12 @@
       "task": "T7.0 (Part 7 JCEF 接入)",
       "result": "pass",
       "detail": "T7.0 JCEF 落地完成：引入 me.friwi:jcefmaven:146.0.10（jcef-api+jogl）；探针验证 OSR(JOGL) 无 GL 表面不推进 load → 改非 OSR + 隐藏 AWT Frame（1x1 屏幕外，EDT 驱动）；CefEnv 全局初始化 + JcefDesktopWebView 实现（loadURL[header]/loadHtml[data:]/evaluateJavascript[__legadoEval+cefQuery 往返，结果 JSON 风格对齐 Android]/onBeforeBrowse/onResourceLoad[getResourceRequestHandler]/console/onCertificateError→Continue/JS 桥 window.<name> Proxy 反射 + _memData 同步 getFromMemory）；导航竞态修复（readyForNav+isLoading 挂起，加载中 loadURL 被丢弃）；CefWebView.init 接线 DesktopWebViewFactory.creator（LEGADO_DESKTOP_ENABLE_JCEF=1 启用）；bundle ~350MB 首次下载到 <home>/jcef-bundle；--webview-smoke-test 15 项断言（11 纯逻辑 + 4 真实 JCEF：真实加载 URL/HTML+eval 取回、sourceRegex onResourceLoad、JS 桥往返）连跑 3 次全绿；无 bundle 环境 [SKIP] 降级；--jcef-probe 保留；教训35/36"
+    },
+    {
+      "at": "2026-08-12T12:00:00+08:00",
+      "task": "全量编译测试 + 跨平台 bug 修复",
+      "result": "pass",
+      "detail": "全量编译测试：clean build installDist 通过 + 7 个冒烟 137 断言全绿（dao25/net16/rule23/src18/api29/local11/webview15）+ 服务级校验（health/CORS/404 JSON/25表+视图）；发现并修复 3 处 Windows 跨平台 bug：①GsonExtensions InputStream 字符集（GBK→UTF-8，备份恢复 mojibake）；②EpubFile mCharset（defaultCharset→UTF-8，EPUB 正文乱码）；③SqlExecutor 多行 vararg 展平只插第一行（args>占位符 → chunked 走 executeBatch，对齐 Room @Insert(vararg)）+ ServerDaoImpl 空 vararg 全 NULL INSERT（空列表 no-op）；教训37/38/39"
     }
   ]
 }

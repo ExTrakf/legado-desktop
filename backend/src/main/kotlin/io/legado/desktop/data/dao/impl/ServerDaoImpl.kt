@@ -30,6 +30,7 @@ class ServerDaoImpl : ServerDao {
     }
 
     override fun insert(vararg server: Server) {
+        if (server.isEmpty()) return // 原版 Room @Insert(空列表) 为 no-op，避免空 SQL 全 NULL 触发 NOT NULL
         withLock {
             db.execute(
                 "INSERT OR REPLACE INTO servers (id, name, type, config, sortNumber) VALUES (?,?,?,?,?)",

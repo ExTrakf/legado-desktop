@@ -77,7 +77,7 @@ class EpubFile(var book: Book) : AutoCloseable {
 
     private val openedBookUrl = book.bookUrl
 
-    private var mCharset: Charset = Charset.defaultCharset()
+    private var mCharset: Charset = Charsets.UTF_8 // 对齐 Android（恒 UTF-8），桌面跨平台避免 Windows 默认 GBK
 
     private var zipFile: AndroidZipFile? = null
     private var epubBook: EpubBook? = null

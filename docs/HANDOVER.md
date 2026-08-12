@@ -481,3 +481,31 @@
 - Part 0/1/2/3/4/5/6 done + **Part 7 引擎层 T7.0~T7.5 done**（--webview-smoke-test 15 [PASS] 连跑 3 次全绿；无 bundle 降级 [SKIP] 不失败；--dao/--net 无回归），STATUS.json 已同步（lessons 追加 34~36；T7.0 置 done）
 - remote main 最新：本会话提交后更新
 - 下一步：**Compose Multiplatform 前端**（T7.6 骨架 → T7.7 书架/书源/阅读 → T7.8 前端 WebView 集成 + Part7 联测），见 PLAN.md 第 7.5 节
+
+## 15. 全量编译测试会话经验（2026-08-12，交接给下一会话）
+
+> 本会话从「clean build installDist → 逐个跑 7 个冒烟 → local 失败 → 定位 3 处跨平台 bug → SqlExecutor 多行修复 → 全量回归 → 服务级校验」全程完成。
+> **结论：全量编译通过，7 个冒烟（137 断言）+ 服务级校验全绿；顺带修复 3 处真实跨平台 bug（Windows 专属，Linux 上不显现）。**
+
+### 15.1 本轮完成
+- **全量编译**：`clean build installDist` BUILD SUCCESSFUL（compileKotlin/compileJava 0 错误，无测试源码）
+- **7 个冒烟全绿**：--dao-smoke-test 25 / --net-smoke-test 16 / --rule-smoke-test 23 / --source-smoke-test 18 / --api-smoke-test 29 / --local-smoke-test 11 / --webview-smoke-test 15（含 JCEF 真实段）= **137 断言**
+- **服务级校验**（等价 test_backend.sh 3-4 节）：health isSuccess:true + service 名 / CORS OPTIONS 带 Origin 回显 / 404 返回 isSuccess:false JSON / books.db 25 表 + book_sources_part 视图
+- **修复 3 处跨平台 bug**（详见 15.2）
+
+### 15.2 修复的 bug（Windows 平台显现，Linux/Android 恒 UTF-8 掩盖）
+1. **GsonExtensions.fromJsonObject/fromJsonArray(InputStream)**（GsonExtensions.kt）：`InputStreamReader(inputStream)` 未指定字符集 → Windows 默认 GBK → 备份恢复（Restore.fileToListT）读 UTF-8 JSON 变 mojibake → 书源/规则名乱码、断言失败。**改显式 UTF-8**。教训37。
+2. **EpubFile.mCharset = Charset.defaultCharset()**（EpubFile.kt:80）：EPUB 正文解码用平台默认（Windows=GBK）→ 乱码。原版 Android 恒 UTF-8（忠于原版语义）。**改 UTF-8**。教训37。
+3. **SqlExecutor.execute 多行 vararg 展平**（SqlExecutor.kt）：DAO 把 k 行参数 flatMap 展平传单行 SQL（如 bookSourceDao.insert(s1,s2) → 66 参数对 33 占位符），bind() 只消耗占位符数参数 → **只写第一行，后续静默丢失**。Restore/ImportOldData 备份 2+ 数据只恢复第一条（local 冒烟只断言第一本"斗破苍穹"掩盖）。**修复：execute() 检测 args.size > 占位符数 → chunked(rowSize) 走 executeBatch；executeBatch 改返回受影响行数**。教训38。
+4. **ServerDaoImpl.insert 空 vararg**：`insert(*[])` → flatMap 空 → 单行 SQL 全 NULL 绑定 → NOT NULL servers.name 失败（round-trip 备份恒写空 servers.json → Restore 空列表 insert）。**加 `if (server.isEmpty()) return`**（Room @Insert(空) no-op 语义）。教训38。
+
+### 15.3 踩的坑（别重踩）
+- **Windows 控制台是 GBK**：Java System.out 重定向到文件用平台默认字符集（GBK），python `[IO.File]::ReadAllText(log, UTF8)` 会失败或乱码——**读日志用 `open(log, encoding='gbk', errors='replace')`**；冒烟 [PASS]/[FAIL] 标记是 ASCII 不受影响（教训28 价值体现）。
+- **PowerShell Invoke-WebRequest 把 404 当异常**：验证 404 路由要用 `curl.exe -s -w` 或 catch WebException 读响应体；`-SkipHttpErrorCheck` 旧版 PowerShell 没有。
+- **多行 bug 难暴露**：所有冒烟都只插单行，round-trip 备份只有 1 源 2 书且断言只查第一本——**凡 DAO vararg insert，测试必须插 2+ 行并断言全部存在**。
+
+### 15.4 当前状态（2026-08-12 会话结束时）
+- Part 0/1/2/3/4/5/6 done + **Part 7 引擎层 T7.0~T7.5 done**；全量编译测试通过（137 断言 + 服务级校验）；修复 3 处跨平台 bug
+- STATUS.json 已同步（lessons 追加 37~39）
+- remote main 最新：本会话提交后更新
+- 下一步：**Compose Multiplatform 前端**（T7.6 骨架 → T7.7 书架/书源/阅读 → T7.8 前端 WebView 集成 + Part7 联测），见 PLAN.md 第 7.5 节

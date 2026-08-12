@@ -89,7 +89,8 @@ inline fun <reified T> Gson.fromJsonObject(inputStream: InputStream?): Result<T>
         if (inputStream == null) {
             throw JsonSyntaxException("解析流为空")
         }
-        val reader = InputStreamReader(inputStream)
+        // 显式 UTF-8：Backup 写入为 UTF-8，平台默认字符集（Windows=GBK）会导致 mojibake
+        val reader = InputStreamReader(inputStream, Charsets.UTF_8)
         fromJson(reader, genericType<T>()) as T
     }
 }
@@ -99,7 +100,8 @@ inline fun <reified T> Gson.fromJsonArray(inputStream: InputStream?): Result<Lis
         if (inputStream == null) {
             throw JsonSyntaxException("解析流为空")
         }
-        val reader = InputStreamReader(inputStream)
+        // 显式 UTF-8：Backup 写入为 UTF-8，平台默认字符集（Windows=GBK）会导致 mojibake
+        val reader = InputStreamReader(inputStream, Charsets.UTF_8)
         val type = TypeToken.getParameterized(List::class.java, T::class.java).type
         val list = fromJson(reader, type) as List<T?>
         if (list.contains(null)) {

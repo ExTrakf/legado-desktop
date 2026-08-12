@@ -1,6 +1,7 @@
 package io.legado.desktop.api.controller
 
 
+import com.google.gson.JsonObject
 import io.legado.desktop.api.ReturnData
 import io.legado.desktop.data.appDb
 import io.legado.desktop.data.entities.BookSource
@@ -125,6 +126,20 @@ object BookSourceController {
         configuredToken: String? = AppConfig.jsSourceApiToken,
     ): Boolean {
         return matchesJsSourceApiToken(configuredToken, headers.header(JS_SOURCE_TOKEN_HEADER))
+    }
+
+    /**
+     * 运行时设置 Web 书源访问令牌（POST /setJsSourceToken，body {"token":"..."}；空串 = 清除）。
+     * 桌面新增入口（原版靠 UI/SharedPreferences）：前端连接页可直接下发，无需手改 config.json。
+     * 仅监听 127.0.0.1，无需令牌即可调用（否则配置初始令牌时会被自己锁死）。
+     */
+    fun setJsSourceToken(postData: String?): ReturnData {
+        val returnData = ReturnData()
+        val token = runCatching {
+            GSON.fromJson(postData, JsonObject::class.java)?.get("token")?.asString
+        }.getOrNull()
+        AppConfig.jsSourceApiToken = token?.takeIf { it.isNotBlank() }
+        return returnData.setData("")
     }
 
     fun hasValidJsSourceWebSocketProtocol(

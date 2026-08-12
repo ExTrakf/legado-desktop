@@ -23,6 +23,16 @@ class CookieDaoImpl : CookieDao {
         db.queryList("select * from cookies where url like '%|%'", emptyList(), Cookie::class.java)
     }
 
+    override fun all(): List<Cookie> = withLock {
+        db.queryList("select * from cookies", emptyList(), Cookie::class.java)
+    }
+
+    override fun deleteAll() {
+        withLock {
+            db.execute("delete from cookies", emptyList())
+        }
+    }
+
     override fun insert(vararg cookie: Cookie) {
         withLock {
             db.execute(

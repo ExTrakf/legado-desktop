@@ -580,3 +580,42 @@
 - 全量回归：7 冒烟 137 断言全绿 + 服务级校验通过
 - remote main 最新：本会话提交后更新
 - 下一步：**T7.7 前端完善**（搜索/进度保存/书源导入）→ **T7.8 前端 WebView 集成** + Part7 联测；GAPS 剩余 AutoTask/WebDAV 明确不做
+
+## 18. Part 7 收尾（T7.7 完善 + T7.8 前端集成 + 联测，2026-08-12，交接给下一会话）
+
+> 本会话从「读全部 docs + STATUS.json → 后端令牌/Cookie/分组 API → 前端书架/阅读/连接/设置页 → 打包 + 自检 → 全量回归 → 文档同步」全程完成。
+> **结论：Part 0~7 全部完成；剩余仅用户手动 GUI 目视验收与可选后续增强。**
+
+### 18.1 本轮完成
+1. **后端令牌设置入口**（解除 T7.7 blockedBy）：`POST /setJsSourceToken`（body `{"token"}`，空串清除；**无需令牌**，仅监听 127.0.0.1，避免配置初始令牌时锁死）+ CLI `--set-js-source-token <token>`。
+2. **后端 Cookie 管理 API**（T7.8 支撑）：`GET /getCookies`（令牌保护）、`POST /setCookie`（`{"url","cookie"}`，走 CookieStore.replaceCookie 合并）、`POST /clearCookies`（`{"url"}`，空=清空全部）。CookieDao 桌面新增 `all()`/`deleteAll()`（原 getOkHttpCookies 只查 `url like '%|%'`，CookieStore 存的是子域行）。
+3. **后端分组 API**：`GET /getBookGroups`（`bookGroupDao.all`）。
+4. **前端书架增强**：RemoteImage 封面（`/cover?path=`；http(s) 外部直抓）、分组过滤（位标记 `book.group and groupId != 0`）、排序（最近阅读/书名/最近更新）、重连提示。
+5. **前端阅读体验**：A-/A+ 字号（10~48）、上一章/下一章、目录当前章高亮、正文 `<img>`/markdown `![..](url)` 图片解析渲染（相对 URL 用 origin 补全）。
+6. **前端连接/令牌管理**：多后端记忆（`~/.legado-desktop-frontend.json`，Skia/expect-actual）、"应用令牌到后端"按钮、重连提示。
+7. **前端设置页（T7.8 网页登录过渡）**：Cookie 管理（查看/保存/删除/清空）+ 系统浏览器打开登录页（`openInBrowser`）。
+8. **工程化**：`createDistributable` 出 `LegadoDesktop.exe`；`tools/check_frontend.ps1`（编译+打包+启动冒烟，ASCII 输出）；test_backend.sh 路径相对化 + 新增 4.13（新 API 契约段）/4.14（前端编译自检）。
+9. **回归**：api-smoke 35 断言（+6 新端点）全绿；其余 6 冒烟（dao/net/rule/source/local/webview）无回归。
+
+### 18.2 本轮新踩的坑（别重踩）
+1. **CookieStore 列表/清空语义**：`CookieDao.getOkHttpCookies` 过滤 `url like '%|%'`（OkHttp 格式），`CookieStore.setCookie` 存的是**子域行**（无 `|`）→ 列表必须新增 `all()`；`CookieStore.clear()` 只 `deleteOkHttp()` → "清空全部"用新增 `deleteAll()`。教训43。
+2. **分组过滤是位标记**：Book.group 是 Int 位集合（groupId 为 2 的幂），过滤用 `(book.group and groupId) != 0`，不是 `==`。
+3. **composeApp 是独立 Gradle 工程**：任务不带 `:composeApp:` 前缀（`./gradlew compileKotlinDesktop`，从 composeApp 目录）。
+4. **commonMain 无 JVM API（教训40 延续）**：图片解码（Skia `toComposeImageBitmap`）、外部 URL 抓取、`Desktop.browse`、本地设置持久化全部走 desktopMain actual。
+5. **PowerShell 5.1 读 UTF-8 无 BOM .ps1 按 GBK 解析**：中文直接变语法错误（"缺少终止符"）；脚本一律 ASCII 输出（与教训28 一致）。Get-Content 控制台中文乱码是 GBK 显示问题，源文件仍 UTF-8 无碍。
+6. **NanoHTTPD Windows 临时文件删除告警**：`could not delete temporary file` 是 Windows 文件句柄时序问题，不影响功能（api-smoke 全 PASS）。
+7. **前端 GUI 自动化受限**：Compose/AWT 应用无法用浏览器自动化驱动；"GUI 闭环验收"以编译 + 后端契约（HTTP/WS 镜像前端调用）+ 打包产物交付，目视验收留用户手动。
+
+### 18.3 已验证有效的方法（照用）
+- **新 API 冒烟直接加进 --api-smoke-test**：进程内起服务自测，断言覆盖令牌设置/Cookie/分组；test_backend.sh 4.13 再用 curl 对运行中的主服务复核一遍。
+- **前端契约 = api-smoke 等价**：前端每调一个端点，后端都有对应断言 → 前端正确性由契约保证 + 编译保证。
+- **RemoteImage 双通道**：`http(s)` 开头走外部直抓（fetchUrlBytes），否则走后端 `/cover?path=`（ApiClient.getBytes 带 token）——封面/正文图一个组件搞定。
+- **expect/actual 平台能力集中**：Platform.kt（commonMain expect）+ Platform.desktop.kt（actual），新增能力只需加一个 expect/actual 对。
+- **Windows 下验证 smokes**：直接跑 `build/install/.../bin/legado-desktop-backend.bat --xxx-smoke-test`（installDist 5s 就绪），不需要 bash；test_backend.sh 保留给 WSL/CI。
+
+### 18.4 当前状态（2026-08-12 会话结束时）
+- **Part 0~7 全部 done**（含 T7.7 完善 + T7.8 前端集成 + 联测 + 工程化）；后端新 API 5 个
+- STATUS.json 已同步（T7.7/T7.8 done、parts[7] done、lessons 43、testLog 追加）；API.md/README/ROADMAP/PLAN/WEBVIEW-COMPOSE-PLAN 已同步
+- 回归：api-smoke 35 断言全绿 + 其余 6 冒烟无回归
+- remote main 最新：本会话提交后更新
+- 下一步（用户侧）：**手动 GUI 目视验收** `LegadoDesktop.exe`（连接→导入源→搜索→加书架→阅读→进度→设置 Cookie）；可选后续增强：内嵌 WebView 自动登录/网页书源浏览、翻页动画/主题

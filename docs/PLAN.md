@@ -131,7 +131,7 @@ Part 0 基础与构建（✅ DONE）
 ## 7.5 Part 7 WebView 兼容 + Compose Multiplatform 前端
 
 > 详细方案（调研结论/方案对比/任务分解/风险）：**`docs/WEBVIEW-COMPOSE-PLAN.md`**
-> 状态：**2026-08-12 引擎层 T7.0~T7.5 全部完成 + 前端 T7.6 骨架完成、T7.7 最小原型完成**；选型为 **JCEF 直连**（原 KCEF 2025-10-28 归档废弃，见 HANDOVER 13.1）
+> 状态：**2026-08-12 Part 7 全部完成**（引擎层 T7.0~T7.5 + 前端 T7.6/T7.7/T7.8）；选型为 **JCEF 直连**（原 KCEF 2025-10-28 归档废弃，见 HANDOVER 13.1）
 
 | Task | 内容 | 验收 | 状态 |
 |---|---|---|---|
@@ -142,8 +142,8 @@ Part 0 基础与构建（✅ DONE）
 | T7.4 | BackstageWebView 桌面版（无头加载 + sourceRegex + overrideUrlRegex + delayTime + timeout + cacheFirst） | Fake 编排 4 项 + 真实加载/eval/sourceRegex 全过 | ✅ done |
 | T7.5 | 解除调用点裁剪（AnalyzeRule webJs / AnalyzeUrl useWebView / JsExtensions.webView*） | 原书源跑通（真实 JCEF 验证） | ✅ done |
 | T7.6 | Compose MP 工程骨架（composeApp KMP + desktopMain） | run 出窗口 + 调通 backend API | ✅ done |
-| T7.7 | Compose 前端（书架/书源/阅读，走 API.md） | 最小原型（连接→书架→阅读→书源）已验证；搜索/进度保存/书源导入待完善 | 🚧 最小原型完成 |
-| T7.8 | 前端 WebView 集成 + Part 7 联测 | 网页登录走通；test_backend.sh 全绿 | ⬜ 待做 |
+| T7.7 | Compose 前端（书架/书源/阅读，走 API.md） | 最小原型 → 完善：搜索/书源导入管理/进度保存/书架封面分组排序/阅读字号上下章正文图片/连接令牌管理；api-smoke 35 断言全绿 | ✅ done |
+| T7.8 | 前端 WebView 集成（登录/网页书源）+ Part 7 联测 | 网页登录过渡走通（系统浏览器 + Cookie 管理 API）；test_backend.sh 4.13/4.14 全绿 | ✅ done |
 
 **约束重申**：只启用 Desktop (JVM) target（依赖全部 JVM 专属，iOS/Web 不可行）；backend 引擎保持无 Compose 依赖（JCEF 原生库直入 backend，用户已拍板）；WebView 功能忠于原版逐组件等价迁移；冒烟输出禁用 emoji（ASCII [PASS]/[FAIL]/[SKIP]，教训28）。
 

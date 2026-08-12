@@ -42,6 +42,20 @@ actual class ApiClient actual constructor(baseUrl: String) {
         response.body()
     }
 
+    actual suspend fun getBytes(path: String): ByteArray = withContext(Dispatchers.IO) {
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl + path))
+            .GET()
+            .timeout(Duration.ofSeconds(30))
+            .applyToken()
+            .build()
+        val response = http.send(request, HttpResponse.BodyHandlers.ofByteArray())
+        if (response.statusCode() !in 200..299) {
+            throw RuntimeException("HTTP ${response.statusCode()}")
+        }
+        response.body()
+    }
+
     actual suspend fun postJson(path: String, body: String): String =
         withContext(Dispatchers.IO) {
             val request = HttpRequest.newBuilder()

@@ -12,9 +12,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
 
-enum class Screen { Connect, Bookshelf, Sources, SourceManage, Read, Search }
+enum class Screen { Connect, Bookshelf, Sources, SourceManage, Read, Search, Settings }
 
-/** 前端全局状态（最小原型，直接 mutableState 驱动） */
+/** 前端全局状态（direct mutableState 驱动） */
 class AppState(val api: ApiClient) {
     var screen by mutableStateOf(Screen.Connect)
     var baseUrl by mutableStateOf("http://127.0.0.1:2323")
@@ -35,14 +35,40 @@ class AppState(val api: ApiClient) {
 
     // 书源管理
     var sourceMessage by mutableStateOf<String?>(null)
+
+    // 书架增强：分组 / 排序
+    var groups by mutableStateOf<List<BookGroup>>(emptyList())
+    var groupFilter by mutableStateOf(-1L) // -1 = 全部，否则位标记 groupId
+    var bookSort by mutableStateOf(0) // 0=最近阅读 1=书名 2=最近更新
+
+    // 阅读体验
+    var fontSize by mutableStateOf(16)
+
+    // 连接/令牌管理
+    var knownBackends by mutableStateOf<List<String>>(emptyList())
+
+    // 设置页（Cookie 管理）
+    var cookies by mutableStateOf<List<Cookie>>(emptyList())
+    var settingsMessage by mutableStateOf<String?>(null)
 }
 
 @Composable
 fun App() {
     val scope = rememberCoroutineScope()
     val state = remember {
-        AppState(ApiClient("http://127.0.0.1:2323")).also {
-            it.api.baseUrl = it.baseUrl
+        AppState(ApiClient("http://127.0.0.1:2323")).also { st ->
+            val saved = loadSettings()
+            st.baseUrl = saved["baseUrl"] ?: st.baseUrl
+            st.api.baseUrl = st.baseUrl
+            st.api.token = saved["token"] ?: ""
+            st.knownBackends = saved["backends"]
+                ?.lineSequence()
+                ?.map { it.trim() }
+                ?.filter { it.isNotBlank() }
+                ?.distinct()
+                ?.toList()
+                ?: emptyList()
+            st.fontSize = saved["fontSize"]?.toIntOrNull() ?: 16
         }
     }
     MaterialTheme {
@@ -54,6 +80,7 @@ fun App() {
                 Screen.SourceManage -> SourceManageScreen(state, scope)
                 Screen.Read -> ReadScreen(state, scope)
                 Screen.Search -> SearchScreen(state, scope)
+                Screen.Settings -> SettingsScreen(state, scope)
             }
         }
     }

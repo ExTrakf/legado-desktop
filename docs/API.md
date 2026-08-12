@@ -17,7 +17,7 @@
 - [x] `POST /saveBook` `POST /deleteBook` — 增删书
 - [x] `GET /getChapterList?url=xxx` — 目录
 - [x] `GET /getBookContent?url=xxx&index=N` — 正文
-- [ ] `GET /cover?path=xxx` `GET /image?...` — 图片（路由已挂，功能 T6.2 实现）
+- [x] `GET /cover?path=xxx` `GET /image?...` — 图片（封面/正文图字节）
 - [x] `POST /saveBookProgress` — 阅读进度
 - [x] `GET/POST /getBookSource(s) /saveBookSource(s) /deleteBookSources` — 书源管理
 - [x] `GET/POST /getRssSource(s) /saveRssSource(s) /deleteRssSources` — RSS 源
@@ -30,13 +30,22 @@
 - [x] `WS /searchBook` — 多源搜索
 - [x] `WS /bookSourceDebug` `WS /rssSourceDebug` — 源调试
 
+**桌面新增（T7.7/T7.8 前端集成）：**
+
+- [x] `POST /setJsSourceToken` — 运行时设置/清除 Web 书源令牌（body `{"token":"..."}`，空串=清除；**无需令牌**，仅监听 127.0.0.1；等价 CLI `--set-js-source-token`）
+- [x] `GET /getCookies` — 全部持久化 Cookie 列表（令牌保护）
+- [x] `POST /setCookie` — 写入/更新 Cookie（body `{"url","cookie"}`，cookie 为完整 `k=v; k2=v2` 串，令牌保护）
+- [x] `POST /clearCookies` — 清除 Cookie（body `{"url"}`；url 空 = 清空全部，令牌保护）
+- [x] `GET /getBookGroups` — 全部书籍分组（groupId 位标记，前端书架分组用）
+
 ## 路由细节
 
 HTTP 服务端口默认 `2323`，WebSocket 服务为 `2323 + 1 = 2324`（原版 `port + 1` 约定）。
 书源写路由（`/saveBookSource(s)` `/deleteBookSources` `/saveRssSource(s)` `/deleteRssSources`
-`/saveReplaceRule` `/deleteReplaceRule` `/testReplaceRule`）与 HTTP 日志读路由
-（`/getHttpLogs` `/getHttpLog`）需要 `x-legado-token` 请求头；WebSocket 需要
+`/saveReplaceRule` `/deleteReplaceRule` `/testReplaceRule` `/setCookie` `/clearCookies`）与
+读路由（`/getHttpLogs` `/getHttpLog` `/getCookies`）需要 `x-legado-token` 请求头；WebSocket 需要
 `Sec-WebSocket-Protocol: legado, legado.token.<token>`。
+`/setJsSourceToken` 无需令牌（仅监听 127.0.0.1，用于配置初始令牌，避免锁死）。
 
 未移植（原版存在但裁剪）：评论相关路由（`/openLegacyReview` `/runLegacyReview` `/legacyReviewPage`
 `/getReviewSummary` `/getReviewDetail` `/getReviewReplies`）、静态资源伺服（官方 web UI，前端分离）。

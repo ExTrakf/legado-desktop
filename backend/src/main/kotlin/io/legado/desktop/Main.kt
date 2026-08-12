@@ -21,6 +21,7 @@ import kotlin.system.exitProcess
  * 参数：
  *   --port <port>   监听端口，默认 2323
  *   --host <addr>   监听地址，默认 127.0.0.1
+ *   --set-js-source-token <token>  设置 Web 书源访问令牌后退出（空串=清除；等价 POST /setJsSourceToken）
  *   --dao-smoke-test 数据层全量冒烟（24 DAO CRUD），跑完即退出（0=通过）
  *   --api-smoke-test Part5 API 层冒烟（HTTP 全路由 + WebSocket 结果流 + 端到端），跑完即退出（0=通过）
  */
@@ -36,6 +37,13 @@ fun main(args: Array<String>) {
     LogUtils.initFileLog(DesktopEnv.configDir)
     appDb.init()
     println("[legado-desktop] database initialized: ${DesktopEnv.dbFile}")
+
+    // 1.6 CLI：设置 Web 书源访问令牌后退出（与 POST /setJsSourceToken 等价；空串=清除）
+    argValue(args, "--set-js-source-token")?.let { token ->
+        io.legado.desktop.help.config.AppConfig.jsSourceApiToken = token.ifBlank { null }
+        println("[legado-desktop] js source api token set${if (token.isBlank()) " (cleared)" else ""}")
+        exitProcess(0)
+    }
 
     // 1.6 DAO 冒烟模式：跑完即退出
     if (args.contains("--dao-smoke-test")) {

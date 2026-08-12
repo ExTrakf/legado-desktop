@@ -30,9 +30,11 @@ data class Book(
     val durChapterIndex: Int = 0,
     val durChapterTitle: String? = null,
     val durChapterPos: Int = 0,
+    val durChapterTime: Long = 0,
+    val latestChapterTime: Long = 0,
     val totalChapterNum: Int = 0,
     val type: Int = 0,
-    val group: Int = 0, // 后端为数字分组 id（非字符串）
+    val group: Int = 0, // 后端为数字分组 id（位标记，非字符串）
 )
 
 @Serializable
@@ -71,6 +73,26 @@ data class SearchResult(
     val tocUrl: String = "",
     val time: Long = 0,
     val originOrder: Int = 0,
+)
+
+/** 书籍分组（GET /getBookGroups；groupId 为位标记，book.group 是 OR 结果） */
+@Serializable
+data class BookGroup(
+    val groupId: Long = 0,
+    val groupName: String = "",
+    val cover: String? = null,
+    val order: Int = 0,
+    val enableRefresh: Boolean = true,
+    val show: Boolean = true,
+    val bookSort: Int = -1,
+    val onlyUpdateRead: Boolean = false,
+)
+
+/** 持久化 Cookie（GET /getCookies） */
+@Serializable
+data class Cookie(
+    val url: String = "",
+    val cookie: String = "",
 )
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -165,4 +187,22 @@ fun progressForShelf(
             chapterTitle?.let { put("durChapterTitle", it) }
         }
     )
+}
+
+/** 设置后端令牌：POST /setJsSourceToken body {"token":"..."} */
+fun tokenForBackend(token: String): String =
+    json.encodeToString(buildJsonObject { put("token", token) })
+
+/** 写入 Cookie：POST /setCookie body {"url","cookie"} */
+fun cookieForSet(url: String, cookie: String): String =
+    json.encodeToString(buildJsonObject { put("url", url); put("cookie", cookie) })
+
+/** 清除 Cookie：POST /clearCookies body {"url"}（空串 = 清空全部） */
+fun cookieForClear(url: String = ""): String =
+    json.encodeToString(buildJsonObject { put("url", url) })
+
+/** 封面图后端路径：/cover?path=<coverUrl> */
+fun coverPath(coverUrl: String?): String? {
+    if (coverUrl.isNullOrBlank()) return null
+    return "/cover?path=${urlEncode(coverUrl)}"
 }

@@ -3,7 +3,9 @@
 # 用法: bash tools/test_backend.sh
 set -u
 
-cd /workspace/legado-desktop/backend
+# 脚本位置无关定位（兼容 WSL/CI 任意工作目录）
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/../backend"
 export GRADLE_USER_HOME=/workspace/.gradle
 export LEGADO_DESKTOP_HOME=${LEGADO_DESKTOP_HOME:-/tmp/legado-test}
 PORT=2323
@@ -75,7 +77,7 @@ else
   bad "books.db 缺失或为空（服务未初始化数据库）"
 fi
 
-python3 << 'PYEOF'
+python3 - "$DBFILE" << 'PYEOF'
 import sqlite3, sys
 ok_fail = [0, 0]
 def ok(m):
@@ -83,7 +85,7 @@ def ok(m):
 def bad(m):
     ok_fail[1] += 1; print(f"  [FAIL] {m}")
 
-conn = sqlite3.connect("/tmp/legado-test/books.db")
+conn = sqlite3.connect(sys.argv[1])
 tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
 views  = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='view' ORDER BY name")]
 
@@ -214,6 +216,41 @@ if [ $WEBVIEW_EXIT -eq 0 ]; then
 else
   bad "Part7 WebView 引擎层冒烟失败（exit=$WEBVIEW_EXIT）"
   grep "\[FAIL\]" /tmp/legado_webview_smoke.log | head -10
+fi
+
+# ---------- 4.13 T7.7/T7.8 前端契约：令牌设置 + Cookie 管理 + 分组（新增 API 冒烟） ----------
+echo "== 4.13 前端契约（/setJsSourceToken /getCookies /setCookie /clearCookies /getBookGroups） =="
+TK="contract-token"
+SETTK=$(curl -s -m 5 -X POST -H "Content-Type: application/json" -d "{\"token\":\"$TK\"}" "$BASE/setJsSourceToken")
+echo "$SETTK" | grep -q '"isSuccess":true' && ok "POST /setJsSourceToken 运行时设置令牌" || bad "setJsSourceToken 失败: $SETTK"
+CK_NO=$(curl -s -m 5 "$BASE/getCookies")
+echo "$CK_NO" | grep -q '"isSuccess":false' && ok "GET /getCookies 无令牌被拒绝" || bad "getCookies 应被拒绝: $CK_NO"
+CK_EMPTY=$(curl -s -m 5 -H "x-legado-token: $TK" "$BASE/getCookies")
+echo "$CK_EMPTY" | grep -q '"isSuccess":true' && ok "GET /getCookies 带令牌可达" || bad "getCookies 带令牌失败: $CK_EMPTY"
+GRP=$(curl -s -m 5 -H "x-legado-token: $TK" "$BASE/getBookGroups")
+echo "$GRP" | grep -q '"isSuccess":true' && ok "GET /getBookGroups 分组列表" || bad "getBookGroups 失败: $GRP"
+SETC=$(curl -s -m 5 -X POST -H "Content-Type: application/json" -H "x-legado-token: $TK" -d '{"url":"http://127.0.0.1","cookie":"a=1; b=2"}' "$BASE/setCookie")
+echo "$SETC" | grep -q '"isSuccess":true' && ok "POST /setCookie 写入 Cookie" || bad "setCookie 失败: $SETC"
+CKLIST=$(curl -s -m 5 -H "x-legado-token: $TK" "$BASE/getCookies")
+echo "$CKLIST" | grep -q '"b=2"' && ok "GET /getCookies 返回刚写入的 Cookie" || bad "getCookies 未含新 Cookie: $CKLIST"
+CLR1=$(curl -s -m 5 -X POST -H "Content-Type: application/json" -H "x-legado-token: $TK" -d '{"url":"http://127.0.0.1"}' "$BASE/clearCookies")
+echo "$CLR1" | grep -q '"isSuccess":true' && ok "POST /clearCookies 删除单个" || bad "clearCookies 失败: $CLR1"
+CKLIST2=$(curl -s -m 5 -H "x-legado-token: $TK" "$BASE/getCookies")
+echo "$CKLIST2" | grep -q '"b=2"' && bad "删除后 Cookie 仍存在" || ok "删除后 Cookie 已移除"
+CLRALL=$(curl -s -m 5 -X POST -H "Content-Type: application/json" -H "x-legado-token: $TK" -d '{}' "$BASE/clearCookies")
+echo "$CLRALL" | grep -q '"isSuccess":true' && ok "POST /clearCookies 清空全部" || bad "clearCookies 清空失败: $CLRALL"
+# 还原令牌（避免影响后续段）
+curl -s -m 5 -X POST -H "Content-Type: application/json" -d '{"token":""}' "$BASE/setJsSourceToken" > /dev/null 2>&1
+
+# ---------- 4.14 Compose 前端自检（compile + desktopJar） ----------
+echo "== 4.14 Compose 前端自检（compileKotlinDesktop + desktopJar） =="
+cd "$SCRIPT_DIR/../composeApp"
+./gradlew compileKotlinDesktop desktopJar --console=plain -q > /tmp/legado_frontend_build.log 2>&1
+if [ $? -eq 0 ]; then
+  ok "Compose 前端编译 + desktopJar 通过"
+else
+  bad "Compose 前端编译失败"
+  tail -20 /tmp/legado_frontend_build.log
 fi
 
 # ---------- 5. 停止服务 ----------

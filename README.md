@@ -92,7 +92,7 @@ frontend/
 - [x] **API 层（Part 5）**：HttpServer 全路由 + WebSocket 搜索/调试 + 书源/RSS/书籍/替换规则/HTTP 日志 API
 - [x] **本地书籍解析（Part 6）**：TXT/EPUB/MOBI/UMD + 封面/图片 + 备份导入
 - [x] **后端补全（GAPS.md 真缺口）**：默认数据导入（keyboardAssists seed + `/restoreDefaultData`）+ 缓存书籍（CacheBook）+ 下载（Download）+ rar/7z 解压
-- [ ] **Part 7**：引擎层 T7.0~T7.5 完成（JCEF 直连，`--webview-smoke-test` 15 项断言含 4 项真实浏览器，连跑 4 次全绿）+ 前端 T7.6 骨架与 T7.7 最小原型完成（composeApp/，连接→书架→阅读→书源）；T7.7 完善（搜索/进度保存/书源导入）+ T7.8 前端 WebView 集成待做
+- [x] **Part 7**：引擎层 T7.0~T7.5 完成（JCEF 直连，`--webview-smoke-test` 15 项断言含 4 项真实浏览器，连跑 4 次全绿）+ 前端 T7.6 骨架 / T7.7 完善（搜索、书源导入管理、进度保存、书架封面分组排序、阅读字号/上下章/正文图片、连接令牌管理）/ T7.8 前端集成（设置页 Cookie 管理 + 系统浏览器网页登录过渡）；新 API `/setJsSourceToken` `/getCookies` `/setCookie` `/clearCookies` `/getBookGroups`；打包 `createDistributable` 出 `LegadoDesktop.exe`
 
 > 数据层细节：24 张实体表 + `book_sources_part` 视图（schema v99）；DAO 接口与 Legado 一致，
 > SQL 逐条对照原版 Room `@Query`；`--dao-smoke-test` 全量冒烟（24 DAO CRUD + flow +
@@ -116,7 +116,7 @@ frontend/
 > 备份导出→清库→恢复→数据一致、Legado 备份 fixture 导入）；vendored `me.ag2s.epublib/umdlib` +
 > `lib.mobi`（Android 专属面仅 Log/Base64/PFD/SparseArray 等，均等价替换）；也由 `tools/test_backend.sh` 集成。
 
-## Part 7：WebView 兼容 + Compose Multiplatform 前端（引擎层完成，前端最小原型）
+## Part 7：WebView 兼容 + Compose Multiplatform 前端（完成）
 
 恢复原版被裁剪的 WebView 能力（`BackstageWebView` 后台无头执行 JS、`@webjs:` 规则、
 `AnalyzeUrl.useWebView` 分支、`JsExtensions.webView*`），并用 Compose Multiplatform
@@ -127,10 +127,13 @@ frontend/
 - WebView 库：**JCEF 直连**（`me.friwi:jcefmaven:146.0.10`；原规划 KCEF 已归档废弃）
 - 引擎层（T7.0~T7.5）：**已完成**——`--webview-smoke-test` 15 项断言（11 纯逻辑 + 4 真实 JCEF）连跑 3 次全绿；
   JCEF 隐藏窗口承载浏览器 + `__legadoEval`/cefQuery JS 往返 + JS 桥 Proxy 反射 + `_memData` 同步
-- 前端（T7.6 骨架 + T7.7 最小原型）：**已完成**——`composeApp/` KMP 工程（Compose 1.11.x），
-  连接后端→书架→阅读→书源四页面，走 API.md；搜索/进度保存/书源导入与前端 WebView 集成（T7.8）待做
+- 前端（T7.6 骨架 + T7.7 完善 + T7.8 前端集成）：**已完成**——`composeApp/` KMP 工程（Compose 1.11.x），
+  连接→书架→阅读→书源→搜索→书源管理→设置 走 API.md；搜索（WS 流）、书源导入管理、阅读进度保存、
+  书架封面/分组/排序、阅读字号/上下章/正文图片、多后端记忆 + 令牌下发、设置页 Cookie 管理 + 系统浏览器网页登录过渡；
+  `createDistributable` 打包出 Windows 分发
 - 启用后端 WebView：环境变量 `LEGADO_DESKTOP_ENABLE_JCEF=1`（首次运行下载 Chromium bundle ~350MB）
-- 网页登录：最小可用阶段不包含；过渡方案 = API 返回登录 URL → 系统浏览器登录 → 手动填 Cookie 到设置
+- 网页登录（过渡方案，已实现）：设置页填站点 URL → 系统浏览器登录 → 复制 Cookie 回填 `/setCookie` → 后端书源自动携带；
+  内嵌 WebView 自动登录/自动回传 Cookie 归入后续（T7.8+ 可选增强）
 
 ## 明确不移植（初版禁用）
 

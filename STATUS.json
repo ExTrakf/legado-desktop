@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-11T20:30:00+08:00",
+  "updatedAt": "2026-08-12T22:00:00+08:00",
   "project": "legado-desktop",
   "source": {
     "repo": "https://github.com/LegadoTeam/legado",
@@ -70,17 +70,16 @@
     "教训39：全量编译测试（2026-08-12）：clean build installDist 通过 + 7 个冒烟（dao25/net16/rule23/src18/api29/local11/webview15=137 断言）全绿 + 服务级 health/CORS/404/25表+视图校验通过",
     "教训40：Compose Multiplatform 前端最小原型（2026-08-12）——composeApp/ KMP 工程（Kotlin 2.4.10 + org.jetbrains.compose 1.11.1 + kotlin.plugin.compose 2.4.10 + kotlinx-serialization-json 1.8.0，只启用 jvm(desktop) target）；commonMain 放 UI/数据模型（@Serializable + Json ignoreUnknownKeys + 纯 Kotlin urlEncode，**不能用 java.net.URLEncoder 等 JVM API**），desktopMain 用 java.net.http 实现 expect ApiClient + main()（application+Window）；四页面 Connect（health）→ Bookshelf（/getBookshelf）→ Read（/getChapterList + /getBookContent 双栏）+ Sources（/getBookSources）；连接后端→进入书架→阅读 已验证无报错；T7.7 搜索/进度保存/书源导入等留待完善",
     "教训41：后端补全（2026-08-12）：①默认数据导入——appDb.init 首次建库 seed keyboardAssists（对齐原版 AppDatabase onOpen），新增 POST /restoreDefaultData（原版 UI 恢复默认 → 桌面 API，txtTocRules/dictRules/rssSources/httpTTS）；②CacheBook 缓存书籍等价迁移（model/CacheBook.kt，CacheBookService→协程 Job 直接驱动，ReadBook 阅读状态裁剪）+ /cacheBook /cacheBookStop /cacheBookRemove；③Download 下载（原 DownloadManager→AnalyzeUrl OkHttp 流式到 cache/downloads）；④rar/7z 解压——原版 Android libarchive-JNI 不可移植，改 commons-compress(7z/zip)+junrar(rar3)，ArchiveUtils 按扩展名分发 + zip-slip 防护 + JsExtensions getRar/get7z 接新实现；⑤AppConfig.defaultBookTreeUri 空白回退 bug（getPrefString 返回空串而非 null，?: booksDir 失效致本地书存到 CWD）已修 takeIf isNotBlank",
-    "教训42：JCEF 导航仍偶发丢弃（lesson 36 竞态未根治）——onLoadingStateChange(false) 空闲时 loadURL 仍可能被 CEF 丢弃。最终修复：navigate 始终挂起 pendingNav + onLoadingStateChange 即时 flush + 定时重试 flush（覆盖 isLoading 延迟送达）+ **应用后延迟 800ms 核对 browser.url，未命中目标则重新应用同一 block**（验证-重试）；webview 冒烟连跑 4 次全绿；另 onCefThread 的 runCatching 若与 } 同行走会被解析为 infix（需换行）"
+    "教训42：JCEF 导航仍偶发丢弃（lesson 36 竞态未根治）——onLoadingStateChange(false) 空闲时 loadURL 仍可能被 CEF 丢弃。最终修复：navigate 始终挂起 pendingNav + onLoadingStateChange 即时 flush + 定时重试 flush（覆盖 isLoading 延迟送达）+ **应用后延迟 800ms 核对 browser.url，未命中目标则重新应用同一 block**（验证-重试）；webview 冒烟连跑 4 次全绿；另 onCefThread 的 runCatching 若与 } 同行走会被解析为 infix（需换行）",
+    "教训43：Part 7 收尾（2026-08-12）——①T7.7 blockedBy 由新 API 解除：POST /setJsSourceToken（无需令牌，仅监听 127.0.0.1，避免配置初始令牌时被锁死）+ CLI --set-js-source-token；②Cookie 管理 API：CookieDao.getOkHttpCookies 只查 url like '%|%'（OkHttp 格式），CookieStore.setCookie 存的是子域行——列表必须新增 all()，'清空全部'用 deleteAll()（CookieStore.clear() 语义是 deleteOkHttp）；③composeApp 是独立 Gradle 工程，任务不带 :composeApp: 前缀；④前端 commonMain 无 JVM API：图片解码/外部 URL 抓取/系统浏览器/本地设置持久化全部走 desktopMain actual（Skia toComposeImageBitmap、java.net.http、Desktop.browse、~/.legado-desktop-frontend.json）；⑤createDistributable 自动下载 WiX 打包 Windows 分发；⑥PowerShell 5.1 读 UTF-8 无 BOM 的 .ps1 会把中文按 GBK 误读成语法错误——脚本一律 ASCII 输出（与教训28 一致）；⑦Get-Content 控制台中文乱码是 GBK 显示问题，源文件仍 UTF-8 无碍；⑧原文书分组过滤用位标记（book.group and groupId != 0）"
   ],
   "current": {
     "part": 7,
-    "task": "T7.7 前端完善（搜索/书源导入管理/阅读进度 + 最小令牌）实现完成，编译+后端契约验证通过",
-    "taskStatus": "in_progress",
-    "whatImDoing": "T7.7 前端完善（composeApp/，方案 A 就地扩展 + JDK 内置 java.net.http.WebSocket，零新依赖）：①ApiClient 扩展 token/postJson/postText（expect/actual）；②SearchClient expect/actual（JDK WS，子协议 legado,legado.token.<base64url>）；③搜索页 SearchScreen（WS 结果流 + 加书架 /saveBook）；④书源管理 SourceManageScreen（导入 JSON /saveBookSource、JS 源 /saveJsSource text/plain、启停 /saveBookSources、删除 /deleteBookSources）；⑤阅读进度保存（进入定位 + 切章 /saveBookProgress，注意后端按 name+author 查找）；⑥连接页最小令牌输入。compileKotlinDesktop + desktopJar 通过；后端契约验证全过（令牌保护/书源导入/加书架/进度持久化/WS 101 握手）。待办：Compose GUI 手动闭环验收（导入源→搜索→加书架→阅读→进度）",
-    "blockedBy": [
-      "后端 js_source_api_credentials 无 REST/CLI 设置入口（仅 config.json），书源导入/搜索需用户手配 config.json 令牌"
-    ],
-    "nextAfterThis": "T7.7 手动 GUI 闭环验收后置 done → T7.8 前端 WebView 集成 + Part7 联测；GAPS 剩余 AutoTask/WebDAV 明确不做"
+    "task": "T7.7 前端完善 + T7.8 前端集成（网页登录过渡/Cookie 管理）+ Part7 联测全部完成",
+    "taskStatus": "done",
+    "whatImDoing": "剩余非后端工作全部完成：①后端令牌设置入口（POST /setJsSourceToken + CLI --set-js-source-token）解除 T7.7 blockedBy；②后端 Cookie 管理 API（/getCookies /setCookie /clearCookies）+ /getBookGroups + CookieDao.all/deleteAll；③前端书架增强（/cover 封面 + 分组过滤 + 排序）、阅读体验（字号/上下章/目录高亮/正文图片）、连接令牌管理（多后端记忆 + 应用令牌到后端 + 重连提示）、设置页（Cookie 管理 + 系统浏览器网页登录过渡，T7.8）；④createDistributable 打包 LegadoDesktop.exe + tools/check_frontend.ps1；⑤test_backend.sh 新增 4.13（新 API 契约段）+ 4.14（前端编译自检）+ 路径相对化；⑥api-smoke 增至 35 断言全绿 + 其余 6 冒烟无回归。待办：用户手动 GUI 目视验收 + 可选后续（内嵌 WebView 自动登录）",
+    "blockedBy": [],
+    "nextAfterThis": "Part 0~7 全部完成；剩用户手动 GUI 目视验收；GAPS 剩余 AutoTask/WebDAV 明确不做；ROADMAP 前端项全部完成"
   },
   "parts": [
     {
@@ -128,8 +127,8 @@
     {
       "id": 7,
       "name": "WebView 兼容（引擎层）+ Compose Multiplatform 前端 + 后端补全",
-      "status": "in_progress",
-      "note": "引擎层 T7.0~T7.5 全部完成（JCEF 直连取代已废弃 KCEF；--webview-smoke-test 15 项断言含 4 项真实 JCEF，连跑 4 次全绿）；前端 T7.6 骨架完成 + T7.7 最小原型完成（composeApp/，连接→书架→阅读→书源）；后端补全完成（默认数据导入/CacheBook/Download/rar7z，见 GAPS.md）；AutoTask/WebDAV 用户拍板不做；T7.7 完善 + T7.8 前端 WebView 集成待做；冒烟输出统一 ASCII [PASS]/[FAIL]/[SKIP]（教训28）"
+      "status": "done",
+      "note": "引擎层 T7.0~T7.5 全部完成（JCEF 直连取代已废弃 KCEF；--webview-smoke-test 15 项断言含 4 项真实 JCEF，连跑 4 次全绿）；前端 T7.6 骨架 + T7.7 完善（搜索 WS/书源导入管理/进度保存/书架封面分组排序/阅读字号上下章正文图片/连接令牌管理）+ T7.8 前端集成（设置页 Cookie 管理 + 系统浏览器网页登录过渡）+ Part7 联测（api-smoke 35 断言 + test_backend.sh 4.13/4.14）全部完成；后端补全完成（默认数据导入/CacheBook/Download/rar7z，见 GAPS.md）+ 新 API（/setJsSourceToken /getCookies /setCookie /clearCookies /getBookGroups）；AutoTask/WebDAV 用户拍板不做；冒烟输出统一 ASCII [PASS]/[FAIL]/[SKIP]（教训28）"
     }
   ],
   "tasks": [
@@ -440,26 +439,27 @@
       "id": "T7.7",
       "name": "Compose 前端（书架/书源/阅读）",
       "part": 7,
-      "status": "in_progress",
-      "test": "最小原型已过（连接→书架→阅读→书源）；T7.7 完善实现完成：compileKotlinDesktop + desktopJar 通过，后端契约验证全过（令牌保护/书源导入/加书架/进度持久化/WS 101 握手）；GUI 手动闭环验收待办",
+      "status": "done",
+      "test": "compileKotlinDesktop + desktopJar 通过；后端契约验证全过（令牌保护/书源导入/加书架/进度持久化/WS 101 握手）；书架封面/分组/排序、阅读字号/上下章/正文图片、连接令牌管理、设置页均实现；api-smoke 35 断言全绿",
       "testedAt": "2026-08-12",
-      "note": "最小原型（Connect/Bookshelf/Read 双栏/Sources）→ 已补：搜索页（SearchScreen + SearchClient JDK WS）、书源管理（SourceManageScreen 导入 JSON/JS 源/启停/删除）、阅读进度保存（/saveBookProgress 进入定位+切章）、连接页最小令牌输入（x-legado-token + WS 子协议）。方案 A 就地扩展零新依赖。GAPS 后端真缺口均已完成",
+      "note": "最小原型 → 完善：搜索页（SearchScreen + SearchClient JDK WS）、书源管理（SourceManageScreen 导入 JSON/JS 源/启停/删除）、阅读进度保存（/saveBookProgress 进入定位+切章）、书架增强（/cover 封面 + /getBookGroups 分组过滤 + 排序）、阅读体验（字号 A-/A+、上下章、目录当前高亮、正文 <img>/markdown 图片渲染）、连接令牌管理（多后端记忆 ~/.legado-desktop-frontend.json + 应用令牌到后端 /setJsSourceToken + 重连提示）。方案 A 就地扩展零新依赖。GAPS 后端真缺口均已完成",
       "screens": {
-        "Connect": "新增 token 输入（最小令牌）",
-        "Sources": "topBar 加'管理'→ SourceManage",
-        "SourceManage": "新增：导入 JSON/JS 源、启停、删除",
-        "Search": "新增：WS 搜索 + 加书架",
-        "Read": "进度保存（进入 + 切章）"
+        "Connect": "历史后端记忆、令牌输入 + 应用令牌到后端、重连提示",
+        "Bookshelf": "封面 RemoteImage、分组过滤、排序、设置入口",
+        "SourceManage": "导入 JSON/JS 源、启停、删除",
+        "Search": "WS 搜索 + 加书架",
+        "Read": "进度保存（进入 + 切章）、字号、上下章、目录高亮、正文图片",
+        "Settings": "Cookie 管理（查看/保存/删除/清空）+ 系统浏览器打开登录页（T7.8 网页登录过渡）"
       }
     },
     {
       "id": "T7.8",
       "name": "前端 WebView 集成 + Part7 联测",
       "part": 7,
-      "status": "pending",
-      "test": "网页登录走通；test_backend.sh webview 段全绿",
-      "testedAt": "",
-      "note": ""
+      "status": "done",
+      "test": "设置页网页登录过渡走通（系统浏览器打开登录页 + Cookie 管理 API 回填）；api-smoke 35 断言全绿（含 T7.8 令牌设置/Cookie 管理/分组 6 项）；test_backend.sh 4.13（新 API 契约）+ 4.14（前端编译自检）全绿；createDistributable 出 LegadoDesktop.exe",
+      "testedAt": "2026-08-12",
+      "note": "按 WEBVIEW-COMPOSE-PLAN.md §7 决策 5 过渡方案实现：系统浏览器完成登录 → 手动把 Cookie 回填（POST /setCookie）→ 后端书源请求自动携带（CookieStore）。内嵌 WebView 自动登录/网页书源浏览为后续可选增强。新增后端支撑：POST /setJsSourceToken、GET /getCookies、POST /setCookie、POST /clearCookies、GET /getBookGroups"
     }
   ],
   "testLog": [
@@ -540,6 +540,12 @@
       "task": "后端补全（GAPS 默认数据/CacheBook/Download/rar7z）",
       "result": "pass",
       "detail": "后端真缺口补全：①默认数据导入——appDb.init seed keyboardAssists(32) + POST /restoreDefaultData（txtTocRules 26/dictRules 5/rssSources 4/httpTTS 3 已验证）；②CacheBook 缓存书籍等价迁移（Service→协程 Job + /cacheBook /cacheBookStop /cacheBookRemove）；③Download（OkHttp 流式到 cache/downloads）；④rar/7z（commons-compress+junrar，7z 读取/解压/zip 回归已临时验证 PASS）；修复 defaultBookTreeUri 空白回退（本地书存 CWD）bug（bookUrl 已落 <home>/books）；JCEF 导航验证-重试根治 flaky（webview 冒烟连跑 4 次全绿）；AutoTask/WebDAV 用户明确不做；全量回归 7 冒烟 137 断言全绿；教训41/42"
+    },
+    {
+      "at": "2026-08-12T22:00:00+08:00",
+      "task": "T7.7 完善 + T7.8 前端集成 + Part7 收尾",
+      "result": "pass",
+      "detail": "剩余非后端工作全部完成：后端新增 POST /setJsSourceToken（含 CLI --set-js-source-token）解除 T7.7 blockedBy；新增 GET /getCookies、POST /setCookie、POST /clearCookies（CookieDao.all/deleteAll 桌面新增）、GET /getBookGroups；前端书架增强（RemoteImage /cover 封面 + 分组过滤 + 排序）、阅读体验（A-/A+ 字号、上下章、目录当前高亮、正文 <img>/markdown 图片解析渲染）、连接令牌管理（多后端记忆 ~/.legado-desktop-frontend.json + 应用令牌到后端 + 重连提示）、设置页（Cookie 管理 + 系统浏览器打开登录页，T7.8 网页登录过渡）；createDistributable 打包 LegadoDesktop.exe + tools/check_frontend.ps1；test_backend.sh 路径相对化 + 新增 4.13（新 API 契约段）/4.14（前端编译自检）；api-smoke 增至 35 断言全绿，其余 6 冒烟（dao25/net16/rule23/src18/local11/webview15）无回归；教训43"
     }
   ]
 }

@@ -1,6 +1,6 @@
 # WebView 兼容功能 + Compose Multiplatform 前端 规划
 
-> 状态：**2026-08-12 引擎层 T7.0~T7.5 全部完成 + 前端 T7.6 骨架完成、T7.7 最小原型完成**（JCEF 直连，--webview-smoke-test 15 断言连跑 3 次全绿）
+> 状态：**2026-08-12 Part 7 全部完成**（引擎层 T7.0~T7.5 JCEF 直连 + 前端 T7.6/T7.7/T7.8；--webview-smoke-test 15 断言连跑 4 次全绿）
 > 关联：PLAN.md（Part 7）、ARCHITECTURE.md（前端解耦原则）、STATUS.json
 > 原则不变：忠于原版业务逻辑（Android→桌面等价替换）；跨平台（Windows/macOS/Linux）
 
@@ -86,8 +86,8 @@ legado-desktop/
 | T7.4 | `BackstageWebView` 桌面版（无头加载 + sourceRegex + overrideUrlRegex + delayTime + timeout + cacheFirst） | 与 Android 版同参数同行为；`--webview-smoke-test`（真实段含加载/eval/sourceRegex） | ✅ done |
 | T7.5 | 解除调用点裁剪：`AnalyzeRule.getWebJsResult`（@webjs:）、`AnalyzeUrl` useWebView 分支、`JsExtensions.webView/webViewGetSource/webViewGetOverrideUrl` | 原有规则/书源跑通（对照原版逻辑逐字恢复） | ✅ done |
 | T7.6 | Compose MP 工程骨架（`composeApp` KMP + desktopMain），最小窗口 + 后端 health 状态显示 | `./gradlew :composeApp:run` 出窗口，调通 backend API | ✅ done |
-| T7.7 | Compose 前端：书架/书源管理/阅读页（走 API.md） | 最小原型（连接→书架→阅读→书源）已验证；搜索/进度保存/书源导入待完善 | 🚧 最小原型完成 |
-| T7.8 | 前端 WebView 集成（登录/网页书源）+ Part 7 联测 | 网页登录走通；`tools/test_backend.sh` 增加 webview 段全绿 | ⬜ 待做 |
+| T7.7 | Compose 前端：书架/书源管理/阅读页（走 API.md） | 最小原型 → 完善：搜索（WS）/书源导入管理/进度保存/书架封面分组排序/阅读字号上下章正文图片/连接令牌管理；api-smoke 35 断言全绿 | ✅ done |
+| T7.8 | 前端 WebView 集成（登录/网页书源）+ Part 7 联测 | 网页登录过渡走通（系统浏览器 + 设置页 Cookie 管理回填）；test_backend.sh 4.13/4.14 全绿；createDistributable 出 exe | ✅ done |
 
 ## 6. 风险与对策
 
@@ -110,11 +110,11 @@ legado-desktop/
 2. **前端范围**：**最小可用**（书架/书源/阅读核心闭环），后续逐步完善
 3. **实施顺序**：**分两步走** —— 先引擎层（T7.1~T7.5，已完成），再做前端（T7.6~T7.8）
 4. **Compose 版本**：**稳定版**（1.11.x，不用 beta）
-5. **网页登录**（登录 UI v2 之外的原版 WebView 登录）：**最小可用阶段不包含**。过渡方案（已确认）：
-   - 引擎/前端提供 API：返回书源登录 URL
-   - 用户在**系统浏览器**中完成登录
-   - 登录后**手动将 Cookie 填入设置**（前端设置页表单），存回 `CookieStore`
-   - 内嵌 WebView 自动登录、自动回传 Cookie 归入**后续完善**（T7.8+ 前端 WebView 集成阶段）
+5. **网页登录**（登录 UI v2 之外的原版 WebView 登录）：**过渡方案已实现（2026-08-12 T7.8）**：
+   - 前端设置页输入书源登录 URL → 在**系统浏览器**中完成登录
+   - 登录后**手动将 Cookie 填入设置页**（`POST /setCookie`，完整 `k=v; k2=v2` 串），存回 `CookieStore`
+   - 后端书源请求自动携带（`CookieStore.getCookie` 原有逻辑）
+   - 内嵌 WebView 自动登录、自动回传 Cookie 归入**后续可选增强**（T7.8+）
 
 ## 8. 附：调研链接
 

@@ -41,6 +41,12 @@ internal fun requireSafeUploadedBookFileName(fileName: String): String {
 object BookController {
 
     /**
+     * 全部书籍分组（桌面新增：GET /getBookGroups，前端书架分组显示用）
+     */
+    val bookGroups: ReturnData
+        get() = ReturnData().setData(appDb.bookGroupDao.all)
+
+    /**
      * 书架所有书籍
      */
     val bookshelf: ReturnData

@@ -599,6 +599,57 @@ object ApiSmokeTest {
                 require(!isSuccess(resp)) { "should fail: $resp" }
             }
 
+            // ============ T7.7/T7.8 前端契约：令牌设置 + Cookie 管理 + 分组 ============
+            check("T7.8 GET /getBookGroups 分组列表") {
+                val resp = body("$base/getBookGroups", token)
+                require(isSuccess(resp) && resp.contains("data")) { "groups=$resp" }
+            }
+
+            check("T7.8 POST /setJsSourceToken 运行时设置令牌") {
+                val resp = post("$base/setJsSourceToken", """{"token":"runtime-token"}""")
+                require(isSuccess(resp)) { "setToken=$resp" }
+                require(AppConfig.jsSourceApiToken == "runtime-token") { "token=${AppConfig.jsSourceApiToken}" }
+                // 还原，避免影响后续令牌校验断言
+                post("$base/setJsSourceToken", """{"token":"$token"}""")
+                require(AppConfig.jsSourceApiToken == token) { "token restore failed: ${AppConfig.jsSourceApiToken}" }
+            }
+
+            check("T7.8 GET /getCookies 无令牌被拒绝") {
+                val resp = body("$base/getCookies")
+                require(!isSuccess(resp)) { "应被拒绝: $resp" }
+            }
+
+            check("T7.8 GET /getCookies 初始为空") {
+                val resp = body("$base/getCookies", token)
+                require(isSuccess(resp) && resp.contains("[]")) { "cookies=$resp" }
+            }
+
+            check("T7.8 POST /setCookie + GET /getCookies 生效") {
+                val set = post(
+                    "$base/setCookie",
+                    """{"url":"$ruleSourceUrl","cookie":"session=x; theme=dark"}""",
+                    token
+                )
+                require(isSuccess(set)) { "setCookie=$set" }
+                val list = body("$base/getCookies", token)
+                require(isSuccess(list) && list.contains("theme") && list.contains("dark")) { "cookies=$list" }
+            }
+
+            check("T7.8 POST /clearCookies 删除单个") {
+                val resp = post("$base/clearCookies", """{"url":"$ruleSourceUrl"}""", token)
+                require(isSuccess(resp)) { "clear=$resp" }
+                val list = body("$base/getCookies", token)
+                require(!list.contains("theme")) { "删除后仍存在: $list" }
+            }
+
+            check("T7.8 POST /clearCookies 清空全部") {
+                post("$base/setCookie", """{"url":"$ruleSourceUrl","cookie":"a=1"}""", token)
+                val resp = post("$base/clearCookies", """{}""", token)
+                require(isSuccess(resp)) { "clearAll=$resp" }
+                val list = body("$base/getCookies", token)
+                require(!list.contains("a=1")) { "清空后仍存在: $list" }
+            }
+
         } finally {
             // 清理：删除测试源 + 关闭 mock + 还原令牌
             runCatching { io.legado.desktop.help.source.SourceHelp.deleteBookSource(ruleSourceUrl) }

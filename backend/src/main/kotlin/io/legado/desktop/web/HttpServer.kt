@@ -4,6 +4,7 @@ import fi.iki.elonen.NanoHTTPD
 import io.legado.desktop.api.ReturnData
 import io.legado.desktop.api.controller.BookController
 import io.legado.desktop.api.controller.BookSourceController
+import io.legado.desktop.api.controller.CookieController
 import io.legado.desktop.api.controller.HttpLogController
 import io.legado.desktop.api.controller.ReplaceRuleController
 import io.legado.desktop.api.controller.RssSourceController
@@ -109,6 +110,9 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                                 "/deleteReplaceRule" -> ReplaceRuleController.delete(postData)
                                 "/testReplaceRule" -> ReplaceRuleController.testRule(postData)
                                 "/restoreDefaultData" -> BookSourceController.restoreDefaultData(postData)
+                                "/setJsSourceToken" -> BookSourceController.setJsSourceToken(postData)
+                                "/setCookie" -> CookieController.setCookie(postData)
+                                "/clearCookies" -> CookieController.clearCookies(postData)
                                 else -> null
                             }
                         }
@@ -145,6 +149,8 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                             "/getRssSource" -> RssSourceController.getSource(parameters)
                             "/getRssSources" -> RssSourceController.sources
                             "/getReplaceRules" -> ReplaceRuleController.allRules
+                            "/getCookies" -> CookieController.cookies
+                            "/getBookGroups" -> BookController.bookGroups
                             else -> null
                         }
                     }
@@ -252,10 +258,13 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
             "/deleteReplaceRule",
             "/testReplaceRule",
             "/restoreDefaultData",
+            "/setCookie",
+            "/clearCookies",
         )
         private val PROTECTED_HTTP_LOG_READ_ROUTES = setOf(
             "/getHttpLogs",
             "/getHttpLog",
+            "/getCookies",
         )
     }
 

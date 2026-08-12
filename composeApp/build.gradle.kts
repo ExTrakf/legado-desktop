@@ -30,6 +30,7 @@ kotlin {
 
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
         }
     }
 }

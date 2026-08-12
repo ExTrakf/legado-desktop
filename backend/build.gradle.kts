@@ -59,6 +59,11 @@ dependencies {
     implementation("org.apache.commons:commons-text:1.13.1")
     implementation("com.github.liuyueyi.quick-chinese-transfer:quick-transfer-core:0.2.17")
 
+    // 压缩（rar/7z 解压，对齐原版 LibArchiveUtils；zip 仍用 JDK）
+    implementation("org.apache.commons:commons-compress:1.27.1")
+    implementation("org.tukaani:xz:1.10")
+    implementation("com.github.junrar:junrar:7.5.5")
+
     // WebView 引擎（JCEF，Part 7 T7.0）：chromiumembedded/java-cef 的 Maven 制品（natives 首次运行下载）
     implementation("me.friwi:jcefmaven:146.0.10")
 

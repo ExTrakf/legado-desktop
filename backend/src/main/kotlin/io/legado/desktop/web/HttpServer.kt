@@ -94,6 +94,9 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                                 "/saveBook" -> BookController.saveBook(postData)
                                 "/deleteBook" -> BookController.deleteBook(postData)
                                 "/saveBookProgress" -> BookController.saveBookProgress(postData)
+                                "/cacheBook" -> BookController.cacheBook(postData)
+                                "/cacheBookStop" -> BookController.cacheBookStop()
+                                "/cacheBookRemove" -> BookController.cacheBookRemove(postData)
                                 "/addLocalBook" -> BookController.addLocalBook(
                                     session.parameters,
                                     files,
@@ -105,6 +108,7 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                                 "/saveReplaceRule" -> ReplaceRuleController.saveRule(postData)
                                 "/deleteReplaceRule" -> ReplaceRuleController.delete(postData)
                                 "/testReplaceRule" -> ReplaceRuleController.testRule(postData)
+                                "/restoreDefaultData" -> BookSourceController.restoreDefaultData(postData)
                                 else -> null
                             }
                         }
@@ -247,6 +251,7 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
             "/saveReplaceRule",
             "/deleteReplaceRule",
             "/testReplaceRule",
+            "/restoreDefaultData",
         )
         private val PROTECTED_HTTP_LOG_READ_ROUTES = setOf(
             "/getHttpLogs",

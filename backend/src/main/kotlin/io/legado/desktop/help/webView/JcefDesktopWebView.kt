@@ -50,7 +50,7 @@ class JcefDesktopWebView : DesktopWebView {
     private var cacheBridgeName: String? = null
 
     private val navLock = Any()
-    private var pendingNav: (() -> Unit)? = null
+    private var pendingNav: PendingNav? = null
     @Volatile
     private var isLoading = false
     @Volatile
@@ -114,10 +114,7 @@ class JcefDesktopWebView : DesktopWebView {
                 if (!isLoading) {
                     readyForNav = true
                     // 空闲时应用挂起的导航（JCEF 在加载中调用 loadURL 会被丢弃）
-                    val nav = synchronized(navLock) {
-                        pendingNav.also { pendingNav = null }
-                    }
-                    nav?.invoke()
+                    applyPendingNav()
                 }
             }
 
@@ -205,6 +202,23 @@ class JcefDesktopWebView : DesktopWebView {
         }
     }
 
+    /** 在 CEF/EDT 线程执行并返回值 */
+    private fun <T> onCefThreadValue(block: () -> T): T? {
+        if (EventQueue.isDispatchThread()) return block()
+        var result: T? = null
+        val done = java.util.concurrent.CountDownLatch(1)
+        SwingUtilities.invokeLater {
+            try {
+                result = block()
+            } catch (_: Throwable) {
+            } finally {
+                done.countDown()
+            }
+        }
+        runCatching { done.await(15, TimeUnit.SECONDS) }
+        return result
+    }
+
     override fun loadUrl(url: String, additionalHeaders: Map<String, String>) {
         val block: () -> Unit = {
             if (additionalHeaders.isEmpty()) {
@@ -219,24 +233,66 @@ class JcefDesktopWebView : DesktopWebView {
                 browser.loadRequest(request)
             }
         }
-        navigate(block)
+        navigate(block, verifyUrl = url)
     }
 
     override fun loadHtml(html: String, baseUrl: String?, encoding: String) {
         // 已知偏差：用 data: URL 加载（相对资源不解析）；原版 loadDataWithBaseURL
         val enc = encoding.ifBlank { "utf-8" }
         val encoded = java.net.URLEncoder.encode(html, enc).replace("+", "%20")
-        navigate {
-            browser.loadURL("data:text/html;charset=$enc,$encoded")
+        navigate(
+            { browser.loadURL("data:text/html;charset=$enc,$encoded") },
+            verifyUrl = "data:"
+        )
+    }
+
+    /** 导航：始终挂起待导航，空闲（readyForNav && !isLoading）时应用。
+     *  双保险：onLoadingStateChange(false) 即时 flush + 定时重试 flush（覆盖 isLoading 标记延迟送达的竞态）；
+     *  应用后核对 browser.url，未命中目标（loadURL 被 CEF 丢弃）则重新应用同一 block。 */
+    private fun navigate(block: () -> Unit, verifyUrl: String? = null) {
+        synchronized(navLock) { pendingNav = PendingNav(block, verifyUrl) }
+        scheduleNavFlush(0)
+    }
+
+    private data class PendingNav(val block: () -> Unit, val verifyUrl: String?)
+
+    private val navRetryExecutor by lazy {
+        java.util.concurrent.Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "legado-nav-flush").apply { isDaemon = true }
         }
     }
 
-    /** 导航：未就绪或加载中则挂起，空闲时立即执行（JCEF 在加载中/未就绪时 loadURL 会被丢弃） */
-    private fun navigate(block: () -> Unit) {
-        if (!readyForNav || isLoading) {
-            synchronized(navLock) { pendingNav = block }
-        } else {
-            onCefThread { block() }
+    private fun applyPendingNav() {
+        val pending = synchronized(navLock) { pendingNav.also { pendingNav = null } } ?: return
+        pending.block()
+        pending.verifyUrl?.let { scheduleNavVerify(it, pending.block) }
+    }
+
+    private fun scheduleNavFlush(delayMs: Long) {
+        runCatching {
+            navRetryExecutor.schedule({
+                onCefThread {
+                    if (!isLoading && readyForNav) {
+                        applyPendingNav()
+                    } else if (synchronized(navLock) { pendingNav != null }) {
+                        // 仍未空闲且有待导航 → 150ms 后重试
+                        scheduleNavFlush(150)
+                    }
+                }
+            }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+        }
+    }
+
+    /** 应用导航后延迟核对 browser.url；未命中说明 loadURL 被丢弃 → 重新应用 */
+    private fun scheduleNavVerify(targetUrl: String, block: () -> Unit) {
+        runCatching {
+            navRetryExecutor.schedule({
+                val current = onCefThreadValue { browser.url ?: "" }
+                if (current?.startsWith(targetUrl) != true) {
+                    onCefThread(block)
+                    scheduleNavVerify(targetUrl, block)
+                }
+            }, 800, java.util.concurrent.TimeUnit.MILLISECONDS)
         }
     }
 
@@ -352,6 +408,7 @@ class JcefDesktopWebView : DesktopWebView {
     // ---------------- 生命周期 ----------------
 
     override fun destroy() {
+        runCatching { navRetryExecutor.shutdownNow() }
         runCatching { browser.close(true) }
         runCatching { awtFrame.dispose() }
         runCatching { client.dispose() }

@@ -9,6 +9,7 @@ import io.legado.desktop.help.book.ContentProcessor
 import io.legado.desktop.help.book.isLocal
 import io.legado.desktop.help.config.AppConfig
 import io.legado.desktop.help.CacheManager
+import io.legado.desktop.model.CacheBook
 import io.legado.desktop.model.analyzeRule.AnalyzeUrl
 import io.legado.desktop.model.ImageProvider
 import io.legado.desktop.model.localBook.LocalBook
@@ -305,6 +306,38 @@ object BookController {
         postData?.let {
             CacheManager.put("webReadConfig", postData)
         } ?: CacheManager.delete("webReadConfig")
+        return returnData.setData("")
+    }
+
+    /**
+     * 缓存书籍章节（对应原版章节列表"缓存"按钮；桌面直接驱动 CacheBook 协程）
+     * body: {"bookUrl": "...", "start": 0, "end": 99}
+     */
+    fun cacheBook(postData: String?): ReturnData {
+        val returnData = ReturnData()
+        val map = GSON.fromJsonObject<Map<String, Any>>(postData).getOrNull()
+            ?: return returnData.setErrorMsg("格式不对")
+        val bookUrl = map["bookUrl"]?.toString() ?: return returnData.setErrorMsg("bookUrl 不能为空")
+        val book = appDb.bookDao.getBook(bookUrl) ?: return returnData.setErrorMsg("未找到书籍")
+        val start = (map["start"] as? Number)?.toInt() ?: 0
+        val end = (map["end"] as? Number)?.toInt() ?: (book.totalChapterNum - 1).coerceAtLeast(start)
+        CacheBook.start(book, start, end)
+        return returnData.setData("")
+    }
+
+    /** 停止缓存（全部） */
+    fun cacheBookStop(): ReturnData {
+        CacheBook.stop()
+        return ReturnData().setData("")
+    }
+
+    /** 移除单本书的缓存队列：body {"bookUrl": "..."} */
+    fun cacheBookRemove(postData: String?): ReturnData {
+        val returnData = ReturnData()
+        val map = GSON.fromJsonObject<Map<String, Any>>(postData).getOrNull()
+            ?: return returnData.setErrorMsg("格式不对")
+        val bookUrl = map["bookUrl"]?.toString() ?: return returnData.setErrorMsg("bookUrl 不能为空")
+        CacheBook.remove(bookUrl)
         return returnData.setData("")
     }
 

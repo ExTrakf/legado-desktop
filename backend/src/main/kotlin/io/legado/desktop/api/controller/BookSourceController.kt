@@ -4,6 +4,7 @@ package io.legado.desktop.api.controller
 import io.legado.desktop.api.ReturnData
 import io.legado.desktop.data.appDb
 import io.legado.desktop.data.entities.BookSource
+import io.legado.desktop.help.DefaultData
 import io.legado.desktop.help.config.AppConfig
 import io.legado.desktop.help.source.SourceHelp
 import io.legado.desktop.model.jsSource.JsSourceUpsert
@@ -183,5 +184,22 @@ object BookSourceController {
             return ReturnData().setErrorMsg(it.localizedMessage ?: "数据格式错误")
         }
         return ReturnData().setData("已执行"/*okSources*/)
+    }
+
+    /**
+     * 恢复默认数据（原版由 UI"恢复默认"按钮触发，桌面版暴露 API）。
+     * body 可传 {"types": ["txtTocRule","dictRule","rssSource","httpTTS"]}；缺省 = 全部恢复。
+     */
+    fun restoreDefaultData(postData: String?): ReturnData {
+        val types = kotlin.runCatching {
+            GSON.fromJsonObject<Map<String, List<String>>>(postData)
+                .getOrNull()?.get("types")
+        }.getOrNull().orEmpty().toHashSet()
+        val all = types.isEmpty()
+        if (all || "txtTocRule" in types) DefaultData.importDefaultTocRules()
+        if (all || "dictRule" in types) DefaultData.importDefaultDictRules()
+        if (all || "rssSource" in types) DefaultData.importDefaultRssSources()
+        if (all || "httpTTS" in types) DefaultData.importDefaultHttpTTS()
+        return ReturnData().setData("恢复默认完成")
     }
 }

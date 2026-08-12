@@ -229,7 +229,7 @@ object AppConfig {
 
     // 书籍保存位置
     var defaultBookTreeUri: String?
-        get() = getPrefString(PreferKey.defaultBookTreeUri)
+        get() = getPrefString(PreferKey.defaultBookTreeUri).takeIf { it.isNotBlank() } // 空白=未设置（对齐 Android getString 未设置返回 null）
         set(value) {
             if (value.isNullOrEmpty()) {
                 removePref(PreferKey.defaultBookTreeUri)

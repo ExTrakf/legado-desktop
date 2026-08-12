@@ -29,7 +29,7 @@ data class Book(
     val durChapterPos: Int = 0,
     val totalChapterNum: Int = 0,
     val type: Int = 0,
-    val group: String? = null,
+    val group: Int = 0, // 后端为数字分组 id（非字符串）
 )
 
 @Serializable

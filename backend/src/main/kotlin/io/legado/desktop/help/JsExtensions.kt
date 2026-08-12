@@ -954,24 +954,12 @@ interface JsExtensions : JsEncodeUtils {
      * @return Rar指定文件的数据
      */
     fun getRarByteArrayContent(url: String, path: String): ByteArray? {
-// 桌面版：压缩包内文件读取（原 LibArchiveUtils 支持 7z/rar/zip，桌面版暂支持 zip）
         val bytes = if (url.isAbsUrl()) {
             AnalyzeUrl(url, source = getSource(), coroutineContext = context).getByteArray()
         } else {
             HexUtil.decodeHex(url)
         }
-        return ByteArrayInputStream(bytes).use { input ->
-            java.util.zip.ZipInputStream(input).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    if (entry.name == path) {
-                        return@use zip.readBytes()
-                    }
-                    entry = zip.nextEntry
-                }
-                null
-            }
-        }
+        return ArchiveUtils.readRarEntryBytes(bytes, path)
     }
 
 
@@ -982,24 +970,12 @@ interface JsExtensions : JsEncodeUtils {
      * @return 7zip指定文件的数据
      */
     fun get7zByteArrayContent(url: String, path: String): ByteArray? {
-// 桌面版：压缩包内文件读取（原 LibArchiveUtils 支持 7z/rar/zip，桌面版暂支持 zip）
         val bytes = if (url.isAbsUrl()) {
             AnalyzeUrl(url, source = getSource(), coroutineContext = context).getByteArray()
         } else {
             HexUtil.decodeHex(url)
         }
-        return ByteArrayInputStream(bytes).use { input ->
-            java.util.zip.ZipInputStream(input).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    if (entry.name == path) {
-                        return@use zip.readBytes()
-                    }
-                    entry = zip.nextEntry
-                }
-                null
-            }
-        }
+        return ArchiveUtils.read7zEntryBytes(bytes, path)
     }
 
 

@@ -125,13 +125,18 @@ fun BookshelfScreen(state: AppState, scope: CoroutineScope) {
         }
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
-            if (state.loading) {
-                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.Center) {
-                    CircularProgressIndicator()
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = { addLocalBook(state, scope) }) {
+                    Text("添加本地书籍")
                 }
+                Spacer(Modifier.width(12.dp))
+                if (state.loading) CircularProgressIndicator()
             }
             state.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+            }
+            if (state.statusText.isNotBlank()) {
+                Text(state.statusText, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 16.dp))
             }
             LazyColumn(Modifier.fillMaxSize()) {
                 items(state.books, key = { it.bookUrl }) { book ->
@@ -154,6 +159,23 @@ fun BookshelfScreen(state: AppState, scope: CoroutineScope) {
                     }
                 }
             }
+        }
+    }
+}
+
+private fun addLocalBook(state: AppState, scope: CoroutineScope) {
+    scope.launch {
+        state.loading = true
+        state.error = null
+        try {
+            val file = pickLocalBookFile() ?: return@launch
+            val resp = state.api.postMultipart("/addLocalBook", file.fileName, file.bytes)
+            state.statusText = if (resp.contains("\"isSuccess\":true")) "导入成功: ${file.fileName}" else "导入返回: $resp"
+            loadBooks(state, scope)
+        } catch (e: Exception) {
+            state.error = "导入本地书失败: ${e.message}"
+        } finally {
+            state.loading = false
         }
     }
 }

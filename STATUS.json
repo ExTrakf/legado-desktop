@@ -66,15 +66,17 @@
     "教训37：全量编译测试发现 3 处 Windows 跨平台字符集 bug（原版在 Android/Linux 恒 UTF-8，Windows 默认 GBK）：①GsonExtensions.fromJsonObject/fromJsonArray(InputStream) 用 InputStreamReader(inputStream) 未指定字符集 → 备份恢复 mojibake（书源/规则名乱码）；②EpubFile.mCharset = Charset.defaultCharset() → EPUB 正文乱码。均改为显式 UTF-8（对齐 Android 语义，也符合教训28 非 UTF-8 禁令）",
     "教训38：SqlExecutor.execute 多行 vararg 展平 bug——DAO 把 k 行参数 flatMap 展平传入单行 SQL，bind() 只消耗占位符数量的参数 → 只写第一行，后续行静默丢失（Restore 备份 2+ 书/源只恢复第一条；local 冒烟只断言第一本'斗破苍穹'掩盖了 bug）。修复：execute() 检测 args.size > 占位符数 → 按单行参数数 chunked 走 executeBatch（对齐 Room @Insert(vararg) 语义）；executeBatch 返回受影响行数。另 ServerDaoImpl.insert 空 vararg 触发全 NULL INSERT 致 NOT NULL 失败（round-trip 备份恒写空 servers.json），已加空列表 no-op（Room 语义）",
     "教训39：全量编译测试（2026-08-12）：clean build installDist 通过 + 7 个冒烟（dao25/net16/rule23/src18/api29/local11/webview15=137 断言）全绿 + 服务级 health/CORS/404/25表+视图校验通过",
-    "教训40：Compose Multiplatform 前端最小原型（2026-08-12）——composeApp/ KMP 工程（Kotlin 2.4.10 + org.jetbrains.compose 1.11.1 + kotlin.plugin.compose 2.4.10 + kotlinx-serialization-json 1.8.0，只启用 jvm(desktop) target）；commonMain 放 UI/数据模型（@Serializable + Json ignoreUnknownKeys + 纯 Kotlin urlEncode，**不能用 java.net.URLEncoder 等 JVM API**），desktopMain 用 java.net.http 实现 expect ApiClient + main()（application+Window）；四页面 Connect（health）→ Bookshelf（/getBookshelf）→ Read（/getChapterList + /getBookContent 双栏）+ Sources（/getBookSources）；连接后端→进入书架→阅读 已验证无报错；T7.7 搜索/进度保存/书源导入等留待完善"
+    "教训40：Compose Multiplatform 前端最小原型（2026-08-12）——composeApp/ KMP 工程（Kotlin 2.4.10 + org.jetbrains.compose 1.11.1 + kotlin.plugin.compose 2.4.10 + kotlinx-serialization-json 1.8.0，只启用 jvm(desktop) target）；commonMain 放 UI/数据模型（@Serializable + Json ignoreUnknownKeys + 纯 Kotlin urlEncode，**不能用 java.net.URLEncoder 等 JVM API**），desktopMain 用 java.net.http 实现 expect ApiClient + main()（application+Window）；四页面 Connect（health）→ Bookshelf（/getBookshelf）→ Read（/getChapterList + /getBookContent 双栏）+ Sources（/getBookSources）；连接后端→进入书架→阅读 已验证无报错；T7.7 搜索/进度保存/书源导入等留待完善",
+    "教训41：后端补全（2026-08-12）：①默认数据导入——appDb.init 首次建库 seed keyboardAssists（对齐原版 AppDatabase onOpen），新增 POST /restoreDefaultData（原版 UI 恢复默认 → 桌面 API，txtTocRules/dictRules/rssSources/httpTTS）；②CacheBook 缓存书籍等价迁移（model/CacheBook.kt，CacheBookService→协程 Job 直接驱动，ReadBook 阅读状态裁剪）+ /cacheBook /cacheBookStop /cacheBookRemove；③Download 下载（原 DownloadManager→AnalyzeUrl OkHttp 流式到 cache/downloads）；④rar/7z 解压——原版 Android libarchive-JNI 不可移植，改 commons-compress(7z/zip)+junrar(rar3)，ArchiveUtils 按扩展名分发 + zip-slip 防护 + JsExtensions getRar/get7z 接新实现；⑤AppConfig.defaultBookTreeUri 空白回退 bug（getPrefString 返回空串而非 null，?: booksDir 失效致本地书存到 CWD）已修 takeIf isNotBlank",
+    "教训42：JCEF 导航仍偶发丢弃（lesson 36 竞态未根治）——onLoadingStateChange(false) 空闲时 loadURL 仍可能被 CEF 丢弃。最终修复：navigate 始终挂起 pendingNav + onLoadingStateChange 即时 flush + 定时重试 flush（覆盖 isLoading 延迟送达）+ **应用后延迟 800ms 核对 browser.url，未命中目标则重新应用同一 block**（验证-重试）；webview 冒烟连跑 4 次全绿；另 onCefThread 的 runCatching 若与 } 同行走会被解析为 infix（需换行）"
   ],
   "current": {
     "part": 7,
-    "task": "T7.6 骨架完成 + T7.7 前端最小原型（连接/书架/书源/阅读）",
-    "taskStatus": "in_progress",
-    "whatImDoing": "Compose Multiplatform 前端最小原型：composeApp/ KMP 工程（Kotlin 2.4.10 + Compose 1.11.1 + kotlinx-serialization，jvm(desktop)）；commonMain UI+模型（@Serializable/Json/纯 Kotlin urlEncode），desktopMain java.net.http actual + application 入口；Connect（/api/health）→ Bookshelf（/getBookshelf）→ Read（/getChapterList+/getBookContent 双栏）→ Sources（/getBookSources）；已手动验证：连接后端→进入书架→阅读，无报错；T7.7 剩余（搜索/进度保存/书源导入）与 T7.8（前端 WebView 集成）待做",
+    "task": "后端补全（默认数据/CacheBook/Download/rar7z）+ 全量回归通过",
+    "taskStatus": "done",
+    "whatImDoing": "后端真缺口补全（GAPS.md 第 9 节执行顺序）：①默认数据导入（keyboardAssists seed + /restoreDefaultData）；②CacheBook 缓存书籍（协程化 + /cacheBook 三接口）；③Download 下载（OkHttp 流式）；④rar/7z 解压（commons-compress+junrar，ArchiveUtils 扩展 + JsExtensions 接入）；修复 defaultBookTreeUri 空白回退 bug；JCEF 导航验证-重试根治 flaky（连跑 4 次全绿）；AutoTask/WebDAV 用户明确不做；全量回归 7 冒烟 137 断言全绿",
     "blockedBy": [],
-    "nextAfterThis": "T7.7 完善（搜索页 / 阅读进度保存 / 书源导入管理）→ T7.8 前端 WebView 集成（登录/网页书源）+ Part7 联测"
+    "nextAfterThis": "T7.7 前端完善（搜索/进度保存/书源导入）→ T7.8 前端 WebView 集成 + Part7 联测；GAPS 剩余 AutoTask/WebDAV 明确不做"
   },
   "parts": [
     {
@@ -521,6 +523,12 @@
       "task": "T7.6~T7.7 最小原型 (Compose Multiplatform 前端)",
       "result": "pass",
       "detail": "Compose Multiplatform 前端最小原型：composeApp/ KMP 工程（Kotlin 2.4.10 + Compose 1.11.1 + kotlinx-serialization 1.8.0，jvm(desktop)）；commonMain UI+@Serializable 模型+expect ApiClient+纯 Kotlin urlEncode，desktopMain java.net.http actual + application 入口；Connect(/api/health)→Bookshelf(/getBookshelf)→Read(/getChapterList+/getBookContent 双栏)→Sources(/getBookSources)；compileKotlinDesktop+desktopJar 通过；手动验证连接后端→进入书架→阅读无报错；教训40"
+    },
+    {
+      "at": "2026-08-12T18:00:00+08:00",
+      "task": "后端补全（GAPS 默认数据/CacheBook/Download/rar7z）",
+      "result": "pass",
+      "detail": "后端真缺口补全：①默认数据导入——appDb.init seed keyboardAssists(32) + POST /restoreDefaultData（txtTocRules 26/dictRules 5/rssSources 4/httpTTS 3 已验证）；②CacheBook 缓存书籍等价迁移（Service→协程 Job + /cacheBook /cacheBookStop /cacheBookRemove）；③Download（OkHttp 流式到 cache/downloads）；④rar/7z（commons-compress+junrar，7z 读取/解压/zip 回归已临时验证 PASS）；修复 defaultBookTreeUri 空白回退（本地书存 CWD）bug（bookUrl 已落 <home>/books）；JCEF 导航验证-重试根治 flaky（webview 冒烟连跑 4 次全绿）；AutoTask/WebDAV 用户明确不做；全量回归 7 冒烟 137 断言全绿；教训41/42"
     }
   ]
 }

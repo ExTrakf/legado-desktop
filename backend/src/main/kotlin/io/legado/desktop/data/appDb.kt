@@ -49,6 +49,7 @@ import io.legado.desktop.data.dao.impl.SearchKeywordDaoImpl
 import io.legado.desktop.data.dao.impl.ServerDaoImpl
 import io.legado.desktop.data.dao.impl.TxtTocRuleDaoImpl
 import io.legado.desktop.env.DesktopEnv
+import io.legado.desktop.help.DefaultData
 
 /**
  * 数据库门面（对应原 Android 版 AppDatabase）。
@@ -127,5 +128,10 @@ object appDb {
         serverDao = ServerDaoImpl()
         txtTocRuleDao = TxtTocRuleDaoImpl()
         autoTaskRuleDao = AutoTaskRuleDaoImpl()
+
+        // 首次建库：若 keyboardAssists 为空则 seed 默认值（对齐原版 AppDatabase onOpen）
+        if (keyboardAssistsDao.all.isEmpty()) {
+            keyboardAssistsDao.insert(*DefaultData.keyboardAssists.toTypedArray())
+        }
     }
 }

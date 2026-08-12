@@ -542,3 +542,41 @@
 - STATUS.json 已同步（lessons 追加 40；T7.6 done、T7.7 in_progress[最小原型]）
 - remote main 最新：本会话提交后更新
 - 下一步：**T7.7 完善**（搜索页 / 阅读进度保存 / 书源导入管理）→ **T7.8 前端 WebView 集成**（登录/网页书源）+ Part7 联测，见 PLAN.md 第 7.5 节
+
+## 17. 后端补全 + 全量忠于原版 diff 会话经验（2026-08-12，交接给下一会话）
+
+> 本会话从「GAPS 真缺口补全 → 新文件忠于原版 diff → 全后端全量归一化 diff → JCEF 导航 flaky 根治 → 全量回归」全程完成。
+> **结论：默认数据/CacheBook/Download/rar7z 已补全（AutoTask/WebDAV 用户明确不做）；全后端 369 匹配文件全量 diff 核对，低相似度全部为文档化重写；7 冒烟 137 断言全绿。**
+
+### 17.1 本轮完成（后端补全）
+1. **默认数据导入**：`appDb.init()` 首次建库若 keyboardAssists 空则 seed（对齐原版 AppDatabase onOpen，32 行已验证）；`POST /restoreDefaultData`（原版 UI"恢复默认"→ 桌面 API，body {"types":[...]} 可选；txtTocRules 26/dictRules 5/rssSources 4/httpTTS 3 已验证）+ 写路由令牌保护
+2. **CacheBook 缓存书籍**：`model/CacheBook.kt` 等价迁移（原版 diff：业务逻辑逐字，仅 CacheBookService→协程 Job `ensureProcess`、ReadBook 阅读状态行裁剪）；API `/cacheBook`（{bookUrl,start,end}）/`/cacheBookStop`/`/cacheBookRemove`
+3. **Download 下载**：`model/Download.kt` 由抛错 stub → OkHttp 流式（AnalyzeUrl.getInputStreamAwait）到 `<数据目录>/cache/downloads`，fileName 路径穿越防护
+4. **rar/7z 解压**：原版 Android libarchive-JNI（me.zhanghai.android.libarchive）不可移植 → commons-compress(7z/zip)+junrar(rar3)+xz；`ArchiveUtils.deCompress/getArchiveFilesName` 按扩展名分发（zip JDK/7z SevenZFile/rar junrar，统一 zip-slip 防护）；`read7zEntryBytes/readRarEntryBytes`；JsExtensions getRar/get7z 接入；7z 创建/读取/deCompress + zip 回归已验证 PASS
+5. **修 defaultBookTreeUri bug**：`getPrefString` 空串 → `takeIf isNotBlank`，本地书从存 CWD 修复为存 `<home>/books`（真实小说导入验证）
+6. **JCEF 导航 flaky 根治**：onLoadingStateChange(false) 空闲时 loadURL 仍偶被 CEF 丢弃 → navigate 始终挂起 pendingNav + 即时/定时重试 flush + **应用后 800ms 核对 browser.url，未命中重新应用**；webview 冒烟连跑 4 次全绿
+
+### 17.2 全后端全量归一化 diff（忠于原版核对，369 匹配文件）
+方法：strip package/import/注释后 SequenceMatcher 相似度排序，低相似度逐类核对。
+结论（全部文档化，无意外逻辑丢失）：
+- **DAO 接口（0.02~0.49）**：原版 @Query SQL 注解行被剥（SQL 迁 dao-sql.json + Impl）；接口方法名级核对零缺失（Part 1 已验）
+- **实体（0.05~0.66）**：@Entity/@Index/@Embedded 注解剥除；字段对应 schema.sql v99（DAO 冒烟验证）
+- **Android 基础设施（0.01~0.45）**：PreferencesExtensions（SharedPreferences 反射+生命周期→DesktopEnv JSON）、BitmapUtils、FileUtils(SAF)、ImageProvider/BookCover(Glide)、DebugLog、LogUtils、AppConst/AppLog —— 文档化等价替换
+- **重写项**：Download（DownloadManager→OkHttp）、ArchiveUtils（libarchive→commons-compress）、PdfFile(stub)、LocalBook/Backup/Restore/HttpServer/SourceCallBack —— 均按 HANDOVER 既有规则标注裁剪
+- **SourceCallBack（0.54）**：书源事件回调 JS（callBackJs，原 UI 触发）桌面无 UI 触发 → 直接 noCall（已注释标注"桌面版无 UI 按钮事件"）；桌面前端后续可经 API 触发
+- **NO-COUNTERPART（0.00）**：AppDatabase/Migrations（→SqliteDatabase+schema.sql）、ReadBook（裁）、AudioCacheKey/StateChanged（音频）、utils/* UI/SAF/canvasrecorder/objectpool/viewbinding（Android UI，不移植）
+- **高相似度（0.7+）**：业务核心（WebBook/BookHelp/AnalyzeRule/SearchModel 等）在前序 Part 2~6 已逐字 diff 验证
+
+### 17.3 踩的坑（别重踩）
+- **commons-compress 7z 需 org.tukaani:xz**（可选依赖，不显式加会 NoClassDefFoundError: FilterOptions）
+- **junrar API**：`nextFileHeader()` 是方法（带括号），`getFileNameString()`/`isDirectory()`；commons-compress 1.27→1.28（junrar 传递）
+- **`} runCatching {}` 同行**：`}` 后紧跟 `runCatching` 会被解析为 infix 调用报错——必须换行
+- **本地书存 CWD**（defaultBookTreeUri 空串）：`getPrefString` 未设置返回 `""` 而非 null，`"" ?: booksDir` 失效 → `takeIf { it.isNotBlank() }`
+- **JCEF 导航被丢弃**（lesson 36 未根治）：仅 onLoadingStateChange(false) flush 不够，须加"应用后核对 browser.url 重试"
+
+### 17.4 当前状态（2026-08-12 会话结束时）
+- Part 0/1/2/3/4/5/6 done + Part 7 引擎层 + 前端最小原型 done + **后端补全（GAPS 4 项）done**
+- STATUS.json 已同步（lessons 追加 41/42；GAPS 已更新完成态 + AutoTask/WebDAV 不做）；GAPS.md 已更新
+- 全量回归：7 冒烟 137 断言全绿 + 服务级校验通过
+- remote main 最新：本会话提交后更新
+- 下一步：**T7.7 前端完善**（搜索/进度保存/书源导入）→ **T7.8 前端 WebView 集成** + Part7 联测；GAPS 剩余 AutoTask/WebDAV 明确不做

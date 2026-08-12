@@ -42,6 +42,9 @@ data class UploadedFile(val fileName: String, val bytes: ByteArray)
 /** 弹出系统文件选择框选取本地书籍（TXT/EPUB/MOBI/UMD） */
 expect suspend fun pickLocalBookFile(): UploadedFile?
 
+/** 弹出系统文件选择框选取任意文本文件（书源 JSON/JS 导入用） */
+expect suspend fun pickTextFile(): UploadedFile?
+
 // ---------------- 平台能力（desktopMain 实现，commonMain 无 JVM API） ----------------
 
 /** 保存前端本地设置（多后端记忆/令牌，持久化到用户目录），返回是否成功 */

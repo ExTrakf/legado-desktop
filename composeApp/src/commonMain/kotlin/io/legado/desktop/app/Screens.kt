@@ -559,6 +559,7 @@ private fun saveProgress(state: AppState, scope: CoroutineScope) {
 @Composable
 fun SourceManageScreen(state: AppState, scope: CoroutineScope) {
     var sourceJson by remember { mutableStateOf("") }
+    var importUrl by remember { mutableStateOf("") }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -580,7 +581,7 @@ fun SourceManageScreen(state: AppState, scope: CoroutineScope) {
             OutlinedTextField(
                 value = sourceJson,
                 onValueChange = { sourceJson = it },
-                label = { Text("粘贴书源 JSON 或 JS 源码") },
+                label = { Text("粘贴书源 JSON / 数组 / JS 源码（Legado 导出 legado.json 数组可直接粘贴）") },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp, max = 320.dp)
             )
             state.sourceMessage?.let {
@@ -591,13 +592,55 @@ fun SourceManageScreen(state: AppState, scope: CoroutineScope) {
             }
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = { scope.launch { importSourceJson(state, scope, sourceJson) } },
+                    onClick = { scope.launch { importContent(state, scope, sourceJson) } },
                     enabled = sourceJson.isNotBlank()
                 ) { Text("导入") }
                 Button(
                     onClick = { scope.launch { importJsSource(state, scope, sourceJson) } },
                     enabled = sourceJson.isNotBlank()
                 ) { Text("导入 JS 源") }
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val file = pickTextFile() ?: return@launch
+                            val text = String(file.bytes, Charsets.UTF_8)
+                            sourceJson = text
+                            importContent(state, scope, text)
+                        }
+                    }
+                ) { Text("从文件导入") }
+            }
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = importUrl,
+                    onValueChange = { importUrl = it },
+                    label = { Text("书源 URL（http/https，自动抓取导入）") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        scope.launch {
+                            val url = importUrl.trim()
+                            if (url.isBlank()) return@launch
+                            val bytes = try {
+                                fetchUrlBytes(url)
+                            } catch (e: Exception) {
+                                state.error = "抓取 URL 失败: ${e.message}"
+                                return@launch
+                            }
+                            if (bytes == null) {
+                                state.error = "抓取 URL 失败: 无内容或非 2xx"
+                                return@launch
+                            }
+                            val text = String(bytes, Charsets.UTF_8)
+                            sourceJson = text
+                            importContent(state, scope, text)
+                        }
+                    },
+                    enabled = importUrl.isNotBlank()
+                ) { Text("从 URL 导入") }
             }
             Text("当前书源（点击启停，删除用右侧按钮）", style = MaterialTheme.typography.titleSmall)
             LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
@@ -642,12 +685,18 @@ private fun loadSources(state: AppState, scope: CoroutineScope) {
     }
 }
 
-/** 导入书源 JSON（POST /saveBookSource） */
-private suspend fun importSourceJson(state: AppState, scope: CoroutineScope, json: String) {
+/** 智能导入：JSON 数组 → /saveBookSources（Legado legado.json 导出即数组）；单对象 → /saveBookSource；其余 → /saveJsSource */
+private suspend fun importContent(state: AppState, scope: CoroutineScope, content: String) {
     state.sourceMessage = null
     state.error = null
+    val t = content.trim()
+    if (t.isEmpty()) return
     try {
-        val raw = state.api.postJson("/saveBookSource", json)
+        val raw = when {
+            t.startsWith("[") -> state.api.postJson("/saveBookSources", t)
+            t.startsWith("{") -> state.api.postJson("/saveBookSource", t)
+            else -> state.api.postText("/saveJsSource", t)
+        }
         val (ok, msg) = returnStatus(raw)
         state.sourceMessage = if (ok) "导入成功" else ("导入失败: ${msg ?: "未知错误"}")
         loadSources(state, scope)

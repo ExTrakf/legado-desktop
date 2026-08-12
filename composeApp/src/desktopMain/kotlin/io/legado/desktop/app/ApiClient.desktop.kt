@@ -129,3 +129,12 @@ actual suspend fun pickLocalBookFile(): UploadedFile? = withContext(Dispatchers.
     dialog.dispose()
     file?.let { UploadedFile(it.name, it.readBytes()) }
 }
+
+actual suspend fun pickTextFile(): UploadedFile? = withContext(Dispatchers.Main) {
+    val dialog = FileDialog(null as java.awt.Frame?, "选择书源文件（JSON / JS）", FileDialog.LOAD)
+    dialog.isMultipleMode = false
+    dialog.isVisible = true
+    val file = dialog.files.firstOrNull()
+    dialog.dispose()
+    file?.let { UploadedFile(it.name, it.readBytes()) }
+}

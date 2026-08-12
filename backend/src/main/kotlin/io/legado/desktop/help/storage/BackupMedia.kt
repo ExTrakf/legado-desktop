@@ -12,6 +12,18 @@ internal fun findBackupMediaDirectories(externalFilesRoot: File): List<File> {
     }
 }
 
+/** 上游新增：恢复备份后，把备份里的绝对封面路径重映射回本地 covers 目录（避免指向备份源路径） */
+internal fun remapRestoredCoverPath(
+    path: String,
+    backupRoot: File,
+    externalFilesRoot: File,
+): String {
+    val source = File(path)
+    if (!source.isAbsolute || source.parentFile?.name != "covers") return path
+    if (!File(backupRoot, "covers/${source.name}").isFile) return path
+    return File(externalFilesRoot, "covers/${source.name}").absolutePath
+}
+
 internal fun prepareBackupMediaDirectories(
     externalFilesRoot: File,
     backupRoot: File,

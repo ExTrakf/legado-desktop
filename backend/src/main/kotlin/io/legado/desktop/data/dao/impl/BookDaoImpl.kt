@@ -204,6 +204,21 @@ class BookDaoImpl : BookDao {
         db.queryValue(sql, listOf(fileName, fileName), Int::class.java) == 1
     }
 
+    override fun getCustomCoverUrl(bookUrl: String): String? = withLock {
+        db.queryValue("select customCoverUrl from books where bookUrl = ?", listOf(bookUrl), String::class.java)
+    }
+
+    override fun updateCustomCoverUrlIfUnchanged(
+        bookUrl: String,
+        expectedCustomCoverUrl: String?,
+        customCoverUrl: String?,
+    ): Int = withLock {
+        db.execute(
+            "update books set customCoverUrl = ? where bookUrl = ? and customCoverUrl is ?",
+            listOf(customCoverUrl, bookUrl, expectedCustomCoverUrl),
+        )
+    }
+
     override fun insert(vararg book: Book) {
         withLock {
             db.execute(

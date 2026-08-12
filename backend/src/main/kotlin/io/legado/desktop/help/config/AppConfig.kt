@@ -425,6 +425,10 @@ object AppConfig {
             }
         }
 
+    /** 上游新增：令牌是否必填（默认 true；置 false 则写路由/WS 不校验令牌，本地单机可用） */
+    val jsSourceApiTokenRequired: Boolean
+        get() = getPrefBoolean(PreferKey.jsSourceApiTokenRequired, true)
+
     var tocUiUseReplace: Boolean
         get() = getPrefBoolean(PreferKey.tocUiUseReplace)
         set(value) {

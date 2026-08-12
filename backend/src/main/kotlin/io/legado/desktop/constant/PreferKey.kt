@@ -63,6 +63,7 @@ object PreferKey {
     const val threadCount = "threadCount"
     const val webPort = "webPort"
     const val jsSourceApiToken = "jsSourceApiToken"
+    const val jsSourceApiTokenRequired = "jsSourceApiTokenRequired"
     const val keepLight = "keep_light"
     const val webService = "webService"
     const val mcpService = "mcpService"

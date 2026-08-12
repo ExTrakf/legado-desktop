@@ -7,6 +7,7 @@ import io.legado.desktop.data.entities.BookProgress
 import io.legado.desktop.help.book.BookHelp
 import io.legado.desktop.help.book.ContentProcessor
 import io.legado.desktop.help.book.isLocal
+import io.legado.desktop.help.book.update
 import io.legado.desktop.help.config.AppConfig
 import io.legado.desktop.help.CacheManager
 import io.legado.desktop.model.CacheBook
@@ -139,7 +140,7 @@ object BookController {
                 val toc = LocalBook.getChapterList(book)
                 appDb.bookChapterDao.delByBook(book.bookUrl)
                 appDb.bookChapterDao.insert(*toc.toTypedArray())
-                appDb.bookDao.update(book)
+                book.update()
                 return returnData.setData(toc)
             } else {
                 val bookSource = appDb.bookSourceDao.getBookSource(book.origin)
@@ -152,7 +153,7 @@ object BookController {
                 }
                 appDb.bookChapterDao.delByBook(book.bookUrl)
                 appDb.bookChapterDao.insert(*toc.toTypedArray())
-                appDb.bookDao.update(book)
+                book.update()
                 return returnData.setData(toc)
             }
         } catch (e: Exception) {
@@ -268,7 +269,7 @@ object BookController {
                     book.durChapterTitle = bookProgress.durChapterTitle
                     book.durChapterTime = bookProgress.durChapterTime
                     // 原 AppWebDav.uploadBookProgress(bookProgress) + ReadBook 全局阅读状态，桌面版裁剪
-                    appDb.bookDao.update(book)
+                    book.update()
                     return returnData.setData("")
                 }
             }

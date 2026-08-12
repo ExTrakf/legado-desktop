@@ -131,9 +131,26 @@ val maxOrder: Int
 
     fun updateReadConfigJson(bookUrl: String, readConfig: String?)
 
+    /** 上游新增：读取自定义封面（换源/更新时保留 customCoverUrl） */
+    fun getCustomCoverUrl(bookUrl: String): String?
+
+    /** 上游新增：更新时保留 customCoverUrl（避免把自定义封面冲掉） */
+    fun updatePreservingCustomCoverUrl(vararg books: Book) {
+        books.forEach { book ->
+            update(book.copy(customCoverUrl = getCustomCoverUrl(book.bookUrl)))
+        }
+    }
+
+    /** 上游新增：仅当 customCoverUrl 未变时更新（CAS，配合封面持久化） */
+    fun updateCustomCoverUrlIfUnchanged(
+        bookUrl: String,
+        expectedCustomCoverUrl: String?,
+        customCoverUrl: String?,
+    ): Int
+
     fun updatePreservingReadConfig(book: Book) {
         val readConfig = getReadConfigJson(book.bookUrl)
-        update(book)
+        updatePreservingCustomCoverUrl(book)
         updateReadConfigJson(book.bookUrl, readConfig)
     }
 
@@ -148,8 +165,13 @@ val maxOrder: Int
     fun delete(vararg book: Book)
 
     fun replace(oldBook: Book, newBook: Book) {
+        val customCoverUrl = if (has(newBook.bookUrl)) {
+            getCustomCoverUrl(newBook.bookUrl)
+        } else {
+            getCustomCoverUrl(oldBook.bookUrl)
+        }
         delete(oldBook)
-        insert(newBook)
+        insert(newBook.copy(customCoverUrl = customCoverUrl))
     }
 
     fun upProgress(bookUrl: String, pos: Int)

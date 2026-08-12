@@ -4,6 +4,8 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -200,6 +202,14 @@ fun cookieForSet(url: String, cookie: String): String =
 /** 清除 Cookie：POST /clearCookies body {"url"}（空串 = 清空全部） */
 fun cookieForClear(url: String = ""): String =
     json.encodeToString(buildJsonObject { put("url", url) })
+
+/** 删除书源：POST /deleteBookSources 需要 JSON 数组 [{bookSourceUrl}]（后端 GSON.fromJsonArray） */
+fun deleteSourcesPayload(urls: List<String>): String =
+    json.encodeToString(
+        buildJsonArray {
+            urls.forEach { add(buildJsonObject { put("bookSourceUrl", it) }) }
+        }
+    )
 
 /** 封面图后端路径：/cover?path=<coverUrl> */
 fun coverPath(coverUrl: String?): String? {

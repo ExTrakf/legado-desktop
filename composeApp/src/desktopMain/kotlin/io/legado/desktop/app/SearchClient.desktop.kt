@@ -29,50 +29,57 @@ actual class SearchClient actual constructor(
         .connectTimeout(Duration.ofSeconds(10))
         .build()
 
-    actual suspend fun search(key: String, onResult: (String) -> Unit, onDone: () -> Unit) =
-        withContext(Dispatchers.IO) {
-            val done = CompletableDeferred<Unit>()
-            val wsUrl = wsSearchUrl(baseUrl)
-            val offeredProtocol = "legado.token.${base64Url(token.trim())}"
-            val ws = try {
-                http.newWebSocketBuilder()
-                    .subprotocols("legado", offeredProtocol)
-                    .buildAsync(
-                        URI.create(wsUrl),
-                        object : WebSocket.Listener {
-                            override fun onText(
-                                webSocket: WebSocket,
-                                data: CharSequence,
-                                last: Boolean,
-                            ): CompletionStage<*>? {
-                                if (data.length > 0) onResult(data.toString())
-                                webSocket.request(1)
-                                return null
-                            }
+    actual suspend fun search(
+        key: String,
+        onResult: (String) -> Unit,
+        onDone: () -> Unit,
+        onError: (String) -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        val done = CompletableDeferred<Unit>()
+        val wsUrl = wsSearchUrl(baseUrl)
+        val offeredProtocol = "legado.token.${base64Url(token.trim())}"
+        val ws = try {
+            http.newWebSocketBuilder()
+                .subprotocols("legado", offeredProtocol)
+                .buildAsync(
+                    URI.create(wsUrl),
+                    object : WebSocket.Listener {
+                        override fun onText(
+                            webSocket: WebSocket,
+                            data: CharSequence,
+                            last: Boolean,
+                        ): CompletionStage<*>? {
+                            if (data.length > 0) onResult(data.toString())
+                            webSocket.request(1)
+                            return null
+                        }
 
-                            override fun onClose(
-                                webSocket: WebSocket,
-                                statusCode: Int,
-                                reason: String,
-                            ): CompletionStage<*>? {
-                                done.complete(Unit)
-                                return null
-                            }
+                        override fun onClose(
+                            webSocket: WebSocket,
+                            statusCode: Int,
+                            reason: String,
+                        ): CompletionStage<*>? {
+                            done.complete(Unit)
+                            return null
+                        }
 
-                            override fun onError(webSocket: WebSocket, error: Throwable) {
-                                done.complete(Unit)
-                            }
-                        },
-                    ).join()
-            } catch (e: Exception) {
-                onDone()
-                return@withContext
-            }
-            val payload = """{"key":"${escapeJson(key)}"}"""
-            ws.sendText(payload, true).join()
-            done.await()
+                        override fun onError(webSocket: WebSocket, error: Throwable) {
+                            runCatching { onError("搜索连接中断: ${error.message ?: error.javaClass.simpleName}") }
+                            done.complete(Unit)
+                        }
+                    },
+                ).join()
+        } catch (e: Exception) {
+            // 握手失败（令牌不匹配/服务未启动/拒绝）——原实现静默 onDone，改为上报 onError
+            runCatching { onError("搜索连接失败: ${e.message ?: e.javaClass.simpleName}") }
             onDone()
+            return@withContext
         }
+        val payload = """{"key":"${escapeJson(key)}"}"""
+        ws.sendText(payload, true).join()
+        done.await()
+        onDone()
+    }
 
     /** 由 baseUrl（http 端口）推导 WS 搜索地址：scheme http(s)->ws(s)，端口 +1，路径 /searchBook */
     private fun wsSearchUrl(baseUrl: String): String {

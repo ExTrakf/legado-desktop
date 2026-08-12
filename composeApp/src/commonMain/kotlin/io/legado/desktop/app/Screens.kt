@@ -736,12 +736,12 @@ private suspend fun toggleSourceEnable(state: AppState, scope: CoroutineScope, s
     }
 }
 
-/** 删除书源（POST /deleteBookSources，body 为源 url） */
+/** 删除书源（POST /deleteBookSources，body 为 [{bookSourceUrl}] 数组） */
 private suspend fun deleteSource(state: AppState, scope: CoroutineScope, s: BookSource) {
     state.sourceMessage = null
     state.error = null
     try {
-        val raw = state.api.postJson("/deleteBookSources", "\"${s.bookSourceUrl}\"")
+        val raw = state.api.postJson("/deleteBookSources", deleteSourcesPayload(listOf(s.bookSourceUrl)))
         val (ok, msg) = returnStatus(raw)
         state.sourceMessage = if (ok) "已删除" else ("删除失败: ${msg ?: "未知错误"}")
         loadSources(state, scope)
@@ -836,7 +836,24 @@ private suspend fun runSearch(state: AppState, scope: CoroutineScope, key: Strin
                     scope.launch { state.searchResults = state.searchResults + results }
                 }
             },
-            onDone = { scope.launch { state.searching = false } }
+            onDone = {
+                scope.launch {
+                    state.searching = false
+                    if (state.error == null) {
+                        state.sourceMessage = if (state.searchResults.isEmpty()) {
+                            "搜索完成：无结果（请确认书源已启用、站点可访问、已配置令牌）"
+                        } else {
+                            "搜索完成：${state.searchResults.size} 条结果"
+                        }
+                    }
+                }
+            },
+            onError = { msg ->
+                scope.launch {
+                    state.error = msg
+                    state.searching = false
+                }
+            }
         )
     } catch (e: Exception) {
         state.error = "搜索失败: ${e.message}"

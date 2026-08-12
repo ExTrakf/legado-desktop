@@ -32,8 +32,13 @@ expect class ApiClient(baseUrl: String) {
 /** 搜索客户端（expect；desktopMain 用 JDK java.net.http.WebSocket 实现） */
 expect class SearchClient(baseUrl: String, token: String) {
 
-    /** WS 多源搜索：连上后发 {"key":..}；每个结果帧回调 onResult(原始 JSON)；结束/关闭回调 onDone */
-    suspend fun search(key: String, onResult: (String) -> Unit, onDone: () -> Unit)
+    /** WS 多源搜索：连上后发 {"key":..}；每个结果帧回调 onResult(原始 JSON)；结束/关闭回调 onDone；连接/握手/传输错误回调 onError */
+    suspend fun search(
+        key: String,
+        onResult: (String) -> Unit,
+        onDone: () -> Unit,
+        onError: (String) -> Unit = {},
+    )
 }
 
 /** 本地文件选择结果 */

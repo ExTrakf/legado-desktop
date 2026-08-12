@@ -39,6 +39,17 @@ cd backend
 ./gradlew run            # 启动后端，默认监听 http://127.0.0.1:2323
 ```
 
+跨平台启动脚本（自动 `installDist` 构建 + 参数透传，数据目录默认 `~/.legado-desktop`，可用 `LEGADO_DESKTOP_HOME` 覆盖）：
+
+```bash
+# Linux/macOS/Git-Bash/WSL
+tools/start_backend.sh [--build] [--port 2323] [--set-js-source-token <token>] ...
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -File tools/start_backend.ps1 [-build] [-port 2323] ...
+```
+
+后端常见参数：`--port <n>`（默认 2323）、`--host <addr>`（默认 127.0.0.1）、`--set-js-source-token <token>`（设置 Web 书源令牌后退出）、`--api-smoke-test` 等冒烟入口。
+
 首次构建需要下载：
 - Gradle 发行版 8.14.4（约 130 MB）
 - Kotlin 插件与依赖库（约 100 MB）

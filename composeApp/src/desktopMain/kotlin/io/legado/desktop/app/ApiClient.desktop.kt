@@ -15,15 +15,25 @@ actual class ApiClient actual constructor(baseUrl: String) {
 
     actual var baseUrl: String = baseUrl
 
+    actual var token: String = ""
+
     private val http: HttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
         .build()
+
+    private fun HttpRequest.Builder.applyToken(): HttpRequest.Builder {
+        if (token.isNotBlank()) {
+            header("x-legado-token", token)
+        }
+        return this
+    }
 
     actual suspend fun get(path: String): String = withContext(Dispatchers.IO) {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + path))
             .GET()
             .timeout(Duration.ofSeconds(30))
+            .applyToken()
             .build()
         val response = http.send(request, HttpResponse.BodyHandlers.ofString())
         if (response.statusCode() !in 200..299) {
@@ -31,6 +41,38 @@ actual class ApiClient actual constructor(baseUrl: String) {
         }
         response.body()
     }
+
+    actual suspend fun postJson(path: String, body: String): String =
+        withContext(Dispatchers.IO) {
+            val request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + path))
+                .header("Content-Type", "application/json; charset=utf-8")
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                .timeout(Duration.ofSeconds(60))
+                .applyToken()
+                .build()
+            val response = http.send(request, HttpResponse.BodyHandlers.ofString())
+            if (response.statusCode() !in 200..299) {
+                throw RuntimeException("HTTP ${response.statusCode()}: ${response.body()}")
+            }
+            response.body()
+        }
+
+    actual suspend fun postText(path: String, body: String): String =
+        withContext(Dispatchers.IO) {
+            val request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + path))
+                .header("Content-Type", "text/plain; charset=utf-8")
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                .timeout(Duration.ofSeconds(60))
+                .applyToken()
+                .build()
+            val response = http.send(request, HttpResponse.BodyHandlers.ofString())
+            if (response.statusCode() !in 200..299) {
+                throw RuntimeException("HTTP ${response.statusCode()}: ${response.body()}")
+            }
+            response.body()
+        }
 
     actual suspend fun postMultipart(path: String, fileName: String, bytes: ByteArray): String =
         withContext(Dispatchers.IO) {

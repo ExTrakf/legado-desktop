@@ -74,11 +74,13 @@
   ],
   "current": {
     "part": 7,
-    "task": "后端补全（默认数据/CacheBook/Download/rar7z）+ 全量回归通过",
-    "taskStatus": "done",
-    "whatImDoing": "后端真缺口补全（GAPS.md 第 9 节执行顺序）：①默认数据导入（keyboardAssists seed + /restoreDefaultData）；②CacheBook 缓存书籍（协程化 + /cacheBook 三接口）；③Download 下载（OkHttp 流式）；④rar/7z 解压（commons-compress+junrar，ArchiveUtils 扩展 + JsExtensions 接入）；修复 defaultBookTreeUri 空白回退 bug；JCEF 导航验证-重试根治 flaky（连跑 4 次全绿）；AutoTask/WebDAV 用户明确不做；全量回归 7 冒烟 137 断言全绿",
-    "blockedBy": [],
-    "nextAfterThis": "T7.7 前端完善（搜索/进度保存/书源导入）→ T7.8 前端 WebView 集成 + Part7 联测；GAPS 剩余 AutoTask/WebDAV 明确不做"
+    "task": "T7.7 前端完善（搜索/书源导入管理/阅读进度 + 最小令牌）实现完成，编译+后端契约验证通过",
+    "taskStatus": "in_progress",
+    "whatImDoing": "T7.7 前端完善（composeApp/，方案 A 就地扩展 + JDK 内置 java.net.http.WebSocket，零新依赖）：①ApiClient 扩展 token/postJson/postText（expect/actual）；②SearchClient expect/actual（JDK WS，子协议 legado,legado.token.<base64url>）；③搜索页 SearchScreen（WS 结果流 + 加书架 /saveBook）；④书源管理 SourceManageScreen（导入 JSON /saveBookSource、JS 源 /saveJsSource text/plain、启停 /saveBookSources、删除 /deleteBookSources）；⑤阅读进度保存（进入定位 + 切章 /saveBookProgress，注意后端按 name+author 查找）；⑥连接页最小令牌输入。compileKotlinDesktop + desktopJar 通过；后端契约验证全过（令牌保护/书源导入/加书架/进度持久化/WS 101 握手）。待办：Compose GUI 手动闭环验收（导入源→搜索→加书架→阅读→进度）",
+    "blockedBy": [
+      "后端 js_source_api_credentials 无 REST/CLI 设置入口（仅 config.json），书源导入/搜索需用户手配 config.json 令牌"
+    ],
+    "nextAfterThis": "T7.7 手动 GUI 闭环验收后置 done → T7.8 前端 WebView 集成 + Part7 联测；GAPS 剩余 AutoTask/WebDAV 明确不做"
   },
   "parts": [
     {
@@ -439,9 +441,16 @@
       "name": "Compose 前端（书架/书源/阅读）",
       "part": 7,
       "status": "in_progress",
-      "test": "最小原型已过：连接(/api/health)→书架(/getBookshelf)→阅读(/getChapterList+/getBookContent)+书源(/getBookSources)，手动验证无报错",
+      "test": "最小原型已过（连接→书架→阅读→书源）；T7.7 完善实现完成：compileKotlinDesktop + desktopJar 通过，后端契约验证全过（令牌保护/书源导入/加书架/进度持久化/WS 101 握手）；GUI 手动闭环验收待办",
       "testedAt": "2026-08-12",
-      "note": "最小原型完成（Connect/Bookshelf/Read 双栏/Sources 四页）；剩余：搜索页、阅读进度保存、书源导入管理，见 docs/WEBVIEW-COMPOSE-PLAN.md"
+      "note": "最小原型（Connect/Bookshelf/Read 双栏/Sources）→ 已补：搜索页（SearchScreen + SearchClient JDK WS）、书源管理（SourceManageScreen 导入 JSON/JS 源/启停/删除）、阅读进度保存（/saveBookProgress 进入定位+切章）、连接页最小令牌输入（x-legado-token + WS 子协议）。方案 A 就地扩展零新依赖。GAPS 后端真缺口均已完成",
+      "screens": {
+        "Connect": "新增 token 输入（最小令牌）",
+        "Sources": "topBar 加'管理'→ SourceManage",
+        "SourceManage": "新增：导入 JSON/JS 源、启停、删除",
+        "Search": "新增：WS 搜索 + 加书架",
+        "Read": "进度保存（进入 + 切章）"
+      }
     },
     {
       "id": "T7.8",

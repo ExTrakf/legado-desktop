@@ -12,7 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
 
-enum class Screen { Connect, Bookshelf, Sources, Read }
+enum class Screen { Connect, Bookshelf, Sources, SourceManage, Read, Search }
 
 /** 前端全局状态（最小原型，直接 mutableState 驱动） */
 class AppState(val api: ApiClient) {
@@ -27,6 +27,14 @@ class AppState(val api: ApiClient) {
     var chapters by mutableStateOf<List<BookChapter>>(emptyList())
     var content by mutableStateOf("")
     var currentBook by mutableStateOf<Book?>(null)
+    var currentChapterIndex by mutableStateOf(0)
+
+    // 搜索
+    var searchResults by mutableStateOf<List<SearchResult>>(emptyList())
+    var searching by mutableStateOf(false)
+
+    // 书源管理
+    var sourceMessage by mutableStateOf<String?>(null)
 }
 
 @Composable
@@ -34,7 +42,7 @@ fun App() {
     val scope = rememberCoroutineScope()
     val state = remember {
         AppState(ApiClient("http://127.0.0.1:2323")).also {
-            // baseUrl 修改时同步到 ApiClient
+            it.api.baseUrl = it.baseUrl
         }
     }
     MaterialTheme {
@@ -43,7 +51,9 @@ fun App() {
                 Screen.Connect -> ConnectScreen(state, scope)
                 Screen.Bookshelf -> BookshelfScreen(state, scope)
                 Screen.Sources -> SourceScreen(state, scope)
+                Screen.SourceManage -> SourceManageScreen(state, scope)
                 Screen.Read -> ReadScreen(state, scope)
+                Screen.Search -> SearchScreen(state, scope)
             }
         }
     }

@@ -1,7 +1,7 @@
 # Legado Desktop
 
 将 [Legado（开源阅读）](https://github.com/LegadoTeam/legado) 的**完整后端引擎**移植到桌面 JVM 的独立项目。
-前端完全独立开发（不沿用官方 Web UI），通过 HTTP/WebSocket API 与后端通信。
+前端完全独立开发（不沿用官方UI），通过 HTTP/WebSocket API 与后端通信。
 
 > 许可证：GPL-3.0（派生自 Legado，必须保持开源）
 

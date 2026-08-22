@@ -91,17 +91,7 @@ frontend/
   README.md               # 前端说明（你自建；Compose 前端见 composeApp/）
 ```
 
-## 移植状态
 
-- [x] 项目骨架、构建链、最小 HTTP 服务（/api/health）
-- [x] 数据层：SQLite DAO（Room → sqlite-jdbc，**24/24 DAO 完成**，schema 对齐 Legado v99）
-- [x] 配置与网络层：JSON 配置系统（AppConfig/LocalConfig/SourceConfig）+ OkHttp（StrResponse/SSL/gzip/deflate/brotli 解压）+ Cookie 持久化 + HTTP/SOCKS5 代理
-- [x] **规则引擎（Part 3）**：AnalyzeRule（CSS/XPath/JSONPath/Regex/JS 复合规则）+ AnalyzeUrl（key/page/{{js}}/@js/POST）+ Rhino（jsSource mainJs/java 绑定/CryptoJS）
-- [x] **书源与读书引擎（Part 4）**：SourceHelp / jsSource / WebBook
-- [x] **API 层（Part 5）**：HttpServer 全路由 + WebSocket 搜索/调试 + 书源/RSS/书籍/替换规则/HTTP 日志 API
-- [x] **本地书籍解析（Part 6）**：TXT/EPUB/MOBI/UMD + 封面/图片 + 备份导入
-- [x] **后端补全（GAPS.md 真缺口）**：默认数据导入（keyboardAssists seed + `/restoreDefaultData`）+ 缓存书籍（CacheBook）+ 下载（Download）+ rar/7z 解压
-- [x] **Part 7**：引擎层 T7.0~T7.5 完成（JCEF 直连，`--webview-smoke-test` 15 项断言含 4 项真实浏览器，连跑 4 次全绿）+ 前端 T7.6 骨架 / T7.7 完善（搜索、书源导入管理、进度保存、书架封面分组排序、阅读字号/上下章/正文图片、连接令牌管理）/ T7.8 前端集成（设置页 Cookie 管理 + 系统浏览器网页登录过渡）；新 API `/setJsSourceToken` `/getCookies` `/setCookie` `/clearCookies` `/getBookGroups`；打包 `createDistributable` 出 `LegadoDesktop.exe`
 
 > 数据层细节：24 张实体表 + `book_sources_part` 视图（schema v99）；DAO 接口与 Legado 一致，
 > SQL 逐条对照原版 Room `@Query`；`--dao-smoke-test` 全量冒烟（24 DAO CRUD + flow +
